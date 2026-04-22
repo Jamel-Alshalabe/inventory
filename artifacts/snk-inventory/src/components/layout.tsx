@@ -1,9 +1,9 @@
 import { Link, useLocation } from "wouter";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Package,
-  ArrowDownToLine,
-  ArrowUpFromLine,
+  ArrowUpDown,
   FileText,
   Warehouse as WarehouseIcon,
   Users,
@@ -11,6 +11,9 @@ import {
   ScrollText,
   BarChart3,
   LogOut,
+  User,
+  Menu,
+  X,
 } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { Button } from "@/components/ui/button";
@@ -21,6 +24,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { ReactNode } from "react";
 
 type NavItem = {
@@ -33,114 +49,215 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: "/", label: "لوحة التحكم", icon: LayoutDashboard },
   { href: "/products", label: "المنتجات", icon: Package },
-  { href: "/movements/in", label: "الوارد", icon: ArrowDownToLine },
-  { href: "/movements/out", label: "الصادر", icon: ArrowUpFromLine },
+  { href: "/stock-movements", label: "حركة المخزون", icon: ArrowUpDown },
   { href: "/invoices", label: "الفواتير", icon: FileText },
   { href: "/reports", label: "التقارير", icon: BarChart3 },
   { href: "/warehouses", label: "المخازن", icon: WarehouseIcon, roles: ["admin"] },
   { href: "/users", label: "المستخدمين", icon: Users, roles: ["admin"] },
-  { href: "/logs", label: "سجل الأنشطة", icon: ScrollText },
   { href: "/settings", label: "الإعدادات", icon: SettingsIcon, roles: ["admin"] },
+  { href: "/logs", label: "سجل العمليات", icon: ScrollText },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, warehouses, selectedWarehouseId, setSelectedWarehouseId, settings, logout } =
     useApp();
   const [location] = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth >= 768) {
+        setSidebarOpen(false);
+      }
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   if (!user) return <>{children}</>;
 
   const visibleNav = NAV.filter((n) => !n.roles || n.roles.includes(user.role));
   const lockedWarehouse = user.role === "user" && !!user.assignedWarehouseId;
-  const currentName =
-    settings.companyName || "شركة سنك لقطع غيار السيارات";
+  const currentName = settings.companyName || "شركة سنك";
 
   return (
     <div className="min-h-screen flex bg-background text-foreground" dir="rtl">
+      {/* Mobile backdrop */}
+      {isMobile && sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
       {/* Right sidebar */}
-      <aside className="w-64 shrink-0 border-l border-border bg-sidebar flex flex-col">
-        <div className="px-5 py-5 border-b border-sidebar-border">
+      <aside className={`
+        ${isMobile 
+          ? `fixed top-0 right-0 h-screen z-50 transform transition-transform duration-300 ease-in-out ${
+              sidebarOpen ? 'translate-x-0' : 'translate-x-full'
+            }`
+          : 'w-64 sticky top-0 h-screen self-start shrink-0'
+        } 
+        border-l border-border bg-[#0d0d1a] flex flex-col
+      `}>
+        <div className="px-5 py-5 border-b border-slate-800/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-lg bg-primary/15 text-primary flex items-center justify-center font-bold text-lg">
+            <div className="size-12 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 text-white flex items-center justify-center font-bold text-lg shadow-lg">
               سنك
             </div>
             <div className="min-w-0">
-              <div className="font-bold truncate" data-testid="text-company-name">
+              <div className="font-bold truncate text-white text-base" data-testid="text-company-name">
                 {currentName}
               </div>
-              <div className="text-xs text-muted-foreground">نظام إدارة المخزون</div>
+              <div className="text-xs text-slate-400">نظام إدارة المخزون</div>
             </div>
           </div>
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarOpen(false)}
+              className="text-white hover:bg-slate-800/50"
+            >
+              <X className="size-5" />
+            </Button>
+          )}
         </div>
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-          {visibleNav.map((n) => {
+        <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 sidebar-scrollbar">
+          {visibleNav.map((n, index) => {
             const Icon = n.icon;
             const active =
               location === n.href ||
               (n.href !== "/" && location.startsWith(n.href));
             return (
-              <Link key={n.href} href={n.href}>
+              <Link key={n.href} href={n.href} onClick={() => isMobile && setSidebarOpen(false)}>
                 <a
-                  className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors hover-elevate ${
+                  className={`flex items-center gap-3 rounded-lg px-4 py-3 text-[15px] font-medium transition-all duration-200 ${
                     active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
-                      : "text-sidebar-foreground/80"
+                      ? "bg-[#1e3a8a] text-white shadow-lg shadow-blue-900/30 border-r-2 border-blue-400"
+                      : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
                   }`}
                   data-testid={`link-nav-${n.href.replace(/\//g, "-")}`}
                 >
-                  <Icon className="size-4" />
-                  <span>{n.label}</span>
+                  <Icon className="size-5 shrink-0" />
+                  <span className="truncate">{n.label}</span>
                 </a>
               </Link>
             );
           })}
         </nav>
-        <div className="p-3 border-t border-sidebar-border">
-          <div className="px-3 py-2 text-xs">
-            <div className="text-muted-foreground">المستخدم</div>
-            <div className="font-semibold" data-testid="text-current-user">
-              {user.username}
-            </div>
-            <div className="text-muted-foreground mt-1">
-              {user.role === "admin" ? "مدير النظام" : user.role === "user" ? "مستخدم" : "مراجع"}
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2 mt-1"
-            onClick={() => void logout()}
-            data-testid="button-logout"
-          >
-            <LogOut className="size-4" />
-            تسجيل الخروج
-          </Button>
-        </div>
+       
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-border bg-card/50 backdrop-blur flex items-center px-6 gap-4">
+        <header className="h-16 border-b border-border bg-card/50 backdrop-blur flex items-center px-4 md:px-6 gap-4">
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden text-foreground hover:bg-accent/50"
+          >
+            <Menu className="size-5" />
+          </Button>
+          
           <div className="flex-1" />
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">المخزن</span>
-            <Select
-              value={selectedWarehouseId ? String(selectedWarehouseId) : ""}
-              onValueChange={(v) => setSelectedWarehouseId(v ? Number(v) : null)}
-              disabled={lockedWarehouse || warehouses.length === 0}
-            >
-              <SelectTrigger className="w-56" data-testid="select-warehouse">
-                <SelectValue placeholder="اختر المخزن" />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouses.map((w) => (
-                  <SelectItem key={w.id} value={String(w.id)}>
-                    {w.name} ({w.productCount})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-4">
+            {/* Warehouse Selector */}
+            <div className="flex items-center gap-2 hidden lg:flex">
+              <span className="text-sm text-muted-foreground">المخزن</span>
+              <Select
+                value={selectedWarehouseId ? String(selectedWarehouseId) : ""}
+                onValueChange={(v) => setSelectedWarehouseId(v ? Number(v) : null)}
+                disabled={lockedWarehouse || warehouses.length === 0}
+              >
+                <SelectTrigger className="w-32 md:w-48" data-testid="select-warehouse">
+                  <SelectValue placeholder="اختر المخزن" />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses.map((w) => (
+                    <SelectItem key={w.id} value={String(w.id)}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Mobile warehouse selector */}
+            <div className="flex items-center gap-2 lg:hidden">
+              <Select
+                value={selectedWarehouseId ? String(selectedWarehouseId) : ""}
+                onValueChange={(v) => setSelectedWarehouseId(v ? Number(v) : null)}
+                disabled={lockedWarehouse || warehouses.length === 0}
+              >
+                <SelectTrigger className="w-24" data-testid="select-warehouse-mobile">
+                  <SelectValue placeholder="مخزن" />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses.map((w) => (
+                    <SelectItem key={w.id} value={String(w.id)}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="h-8 w-px bg-border" />
+
+            {/* User Profile Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-3 px-2 hover:bg-accent/50">
+                  <div className="text-right hidden sm:block">
+                    <div className="text-sm font-medium text-foreground">
+                      {user.username}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {user.email || `${user.username}@snk.com`}
+                    </div>
+                  </div>
+                  <Avatar className="size-9 border border-border">
+                    <AvatarImage src={user.avatar || undefined} />
+                    <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-800 text-white text-sm font-bold">
+                      {user.username.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">{user.username}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {user.email || `${user.username}@snk.com`}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-muted-foreground">
+                  <User className="mr-2 size-4" />
+                  {user.role === "admin" ? "مدير النظام" : user.role === "user" ? "مستخدم" : "مراجع"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => void logout()}
+                  className="text-red-500 focus:text-red-500 focus:bg-red-50"
+                  data-testid="button-logout"
+                >
+                  <LogOut className="mr-2 size-4" />
+                  تسجيل الخروج
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto overflow-x-hidden custom-scrollbar">{children}</main>
       </div>
     </div>
   );

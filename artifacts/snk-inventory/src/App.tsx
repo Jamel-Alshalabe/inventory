@@ -7,7 +7,7 @@ import { Layout } from "@/components/layout";
 import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
 import ProductsPage from "@/pages/products";
-import MovementsPage from "@/pages/movements";
+import StockMovementsPage from "@/pages/stock-movements";
 import InvoicesPage from "@/pages/invoices";
 import WarehousesPage from "@/pages/warehouses";
 import UsersPage from "@/pages/users";
@@ -37,8 +37,7 @@ function Routes() {
     <Switch>
       <Route path="/" component={DashboardPage} />
       <Route path="/products" component={ProductsPage} />
-      <Route path="/movements/in">{() => <MovementsPage type="in" />}</Route>
-      <Route path="/movements/out">{() => <MovementsPage type="out" />}</Route>
+      <Route path="/stock-movements" component={StockMovementsPage} />
       <Route path="/invoices" component={InvoicesPage} />
       <Route path="/reports" component={ReportsPage} />
       <Route path="/warehouses">

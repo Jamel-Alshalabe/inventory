@@ -39,6 +39,8 @@ export type AuthUser = {
   role: Role;
   assignedWarehouseId: number | null;
   assignedWarehouseName: string | null;
+  email?: string;
+  avatar?: string;
 };
 
 export type Warehouse = { id: number; name: string; productCount: number };
@@ -108,6 +110,7 @@ export type DashboardStats = {
   todayOut: number;
   recentMovements: Movement[];
   topProducts: { productCode: string; productName: string; quantity: number }[];
+  dailyMovements?: { date: string; in: number; out: number }[];
 };
 
 export function fmtMoney(n: number, currency = "ج.م"): string {

@@ -15,17 +15,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
+import { useConfirmation } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, FileSpreadsheet, Download, Search } from "lucide-react";
+import { ColumnDef } from "@tanstack/react-table";
 
 type FormState = {
   name: string;
@@ -37,12 +32,117 @@ type FormState = {
 
 const empty: FormState = { name: "", code: "", buyPrice: "0", sellPrice: "0", quantity: "0" };
 
+function getColumns(
+  user: any,
+  openEdit: (product: Product) => void,
+  deleteMut: any,
+  confirm: (options: { title: string; description: string; onConfirm: () => void }) => void
+): ColumnDef<Product>[] {
+  return [
+    {
+      accessorKey: "code",
+      header: "الكود",
+      cell: ({ row }) => (
+        <div className="font-mono text-xs">{row.getValue("code")}</div>
+      ),
+    },
+    {
+      accessorKey: "name",
+      header: "الاسم",
+      cell: ({ row }) => (
+        <div className="font-semibold">{row.getValue("name")}</div>
+      ),
+    },
+    {
+      accessorKey: "buyPrice",
+      header: "سعر الشراء",
+      cell: ({ row }) => {
+        const amount = parseFloat(row.getValue("buyPrice"));
+        return <div>{fmtMoney(amount, "ج.م")}</div>;
+      },
+    },
+    {
+      accessorKey: "sellPrice",
+      header: "سعر البيع",
+      cell: ({ row }) => {
+        const amount = parseFloat(row.getValue("sellPrice"));
+        return <div>{fmtMoney(amount, "ج.م")}</div>;
+      },
+    },
+    {
+      accessorKey: "quantity",
+      header: "الكمية",
+      cell: ({ row }) => {
+        const quantity = row.getValue("quantity") as number;
+        return (
+          <Badge
+            variant="outline"
+            className={
+              quantity === 0
+                ? "border-destructive text-destructive"
+                : quantity <= 5
+                ? "border-chart-3 text-chart-3"
+                : ""
+            }
+          >
+            {quantity}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "warehouseName",
+      header: "المخزن",
+      cell: ({ row }) => (
+        <div className="text-muted-foreground text-sm">{row.getValue("warehouseName")}</div>
+      ),
+    },
+    {
+      id: "actions",
+      header: "إجراءات",
+      cell: ({ row }) => {
+        const product = row.original;
+        const canEdit = user?.role === "admin" || user?.role === "user";
+        
+        if (!canEdit) return null;
+        
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => openEdit(product)}
+              data-testid={`button-edit-${product.id}`}
+            >
+              <Pencil className="size-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => {
+                confirm({
+                  title: "حذف المنتج",
+                  description: `هل أنت متأكد من حذف المنتج "${product.name}"؟ هذا الإجراء لا يمكن التراجع عنه.`,
+                  onConfirm: () => deleteMut.mutate(product.id),
+                });
+              }}
+              data-testid={`button-delete-${product.id}`}
+            >
+              <Trash2 className="size-4 text-destructive" />
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+}
+
 export default function ProductsPage() {
   const { selectedWarehouseId, user, settings } = useApp();
   const currency = settings.currency || "ج.م";
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [search, setSearch] = useState("");
+  const { confirm, ConfirmationComponent } = useConfirmation();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<FormState>(empty);
@@ -50,11 +150,10 @@ export default function ProductsPage() {
   const canEdit = user?.role === "admin" || user?.role === "user";
 
   const { data: products = [] } = useQuery({
-    queryKey: ["products", selectedWarehouseId, search],
+    queryKey: ["products", selectedWarehouseId],
     queryFn: () => {
       const qs = new URLSearchParams();
       if (selectedWarehouseId) qs.set("warehouseId", String(selectedWarehouseId));
-      if (search) qs.set("search", search);
       return api.get<Product[]>(`/products?${qs.toString()}`);
     },
   });
@@ -198,9 +297,7 @@ export default function ProductsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">المنتجات</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {products.length} منتج • {summary.totalQty} قطعة • قيمة {fmtMoney(summary.value, currency)}
-          </p>
+          
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {canEdit && (
@@ -240,7 +337,7 @@ export default function ProductsPage() {
                 </DialogHeader>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2 col-span-2">
-                    <Label>الاسم</Label>
+                    <Label>اسم المنتج</Label>
                     <Input
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -248,7 +345,7 @@ export default function ProductsPage() {
                     />
                   </div>
                   <div className="space-y-2 col-span-2">
-                    <Label>الكود</Label>
+                    <Label>كود الصنف</Label>
                     <Input
                       value={form.code}
                       onChange={(e) => setForm({ ...form, code: e.target.value })}
@@ -274,7 +371,7 @@ export default function ProductsPage() {
                     />
                   </div>
                   <div className="space-y-2 col-span-2">
-                    <Label>الكمية الابتدائية</Label>
+                    <Label>الكمية </Label>
                     <Input
                       type="number"
                       value={form.quantity}
@@ -303,88 +400,16 @@ export default function ProductsPage() {
       </div>
 
       <Card className="p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="size-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="بحث بالاسم أو الكود..."
-              className="pr-10"
-              data-testid="input-search"
-            />
-          </div>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>الكود</TableHead>
-              <TableHead>الاسم</TableHead>
-              <TableHead>سعر الشراء</TableHead>
-              <TableHead>سعر البيع</TableHead>
-              <TableHead>الكمية</TableHead>
-              <TableHead>المخزن</TableHead>
-              {canEdit && <TableHead className="w-32">إجراءات</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {products.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={canEdit ? 7 : 6} className="text-center text-muted-foreground py-12">
-                  لا توجد منتجات
-                </TableCell>
-              </TableRow>
-            )}
-            {products.map((p) => (
-              <TableRow key={p.id} data-testid={`row-product-${p.id}`}>
-                <TableCell className="font-mono text-xs">{p.code}</TableCell>
-                <TableCell className="font-semibold">{p.name}</TableCell>
-                <TableCell>{fmtMoney(p.buyPrice, currency)}</TableCell>
-                <TableCell>{fmtMoney(p.sellPrice, currency)}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant="outline"
-                    className={
-                      p.quantity === 0
-                        ? "border-destructive text-destructive"
-                        : p.quantity <= 5
-                        ? "border-chart-3 text-chart-3"
-                        : ""
-                    }
-                  >
-                    {p.quantity}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground text-sm">{p.warehouseName}</TableCell>
-                {canEdit && (
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => openEdit(p)}
-                        data-testid={`button-edit-${p.id}`}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          if (confirm(`حذف ${p.name}؟`)) deleteMut.mutate(p.id);
-                        }}
-                        data-testid={`button-delete-${p.id}`}
-                      >
-                        <Trash2 className="size-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={getColumns(user, openEdit, deleteMut, confirm)}
+          data={products}
+          searchKey="name"
+          searchPlaceholder="بحث بالاسم أو الكود..."
+          emptyMessage="لا توجد منتجات"
+        />
       </Card>
+      
+      <ConfirmationComponent isLoading={deleteMut.isPending} />
     </div>
   );
 }

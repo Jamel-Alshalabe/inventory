@@ -17,8 +17,11 @@
   },
   "private": true,
   "devDependencies": {
-    "typescript": "~5.9.2",
+    "cross-env": "^7.0.3",
     "prettier": "^3.8.1",
-    "cross-env": "^7.0.3"
+    "typescript": "~5.9.2"
+  },
+  "dependencies": {
+    "@tanstack/react-table": "^8.21.3"
   }
 }

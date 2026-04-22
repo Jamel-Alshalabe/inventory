@@ -20,30 +20,30 @@ export default function LogsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">سجل الأنشطة</h1>
-        <p className="text-muted-foreground text-sm mt-1">آخر {data.length} نشاط في النظام</p>
+        <h1 className="text-2xl font-bold">سجل العمليات</h1>
+        <p className="text-muted-foreground text-sm mt-1">آخر {data.length} عملية في النظام</p>
       </div>
       <Card className="p-5">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>التاريخ</TableHead>
-              <TableHead>المستخدم</TableHead>
-              <TableHead>النشاط</TableHead>
-              <TableHead>التفاصيل</TableHead>
+              <TableHead className="text-right">التاريخ</TableHead>
+              <TableHead className="text-right">المستخدم</TableHead>
+              <TableHead className="text-right">النشاط</TableHead>
+              <TableHead className="text-right">التفاصيل</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.map((l) => (
               <TableRow key={l.id} data-testid={`row-log-${l.id}`}>
-                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap text-right">
                   {fmtDate(l.createdAt)}
                 </TableCell>
-                <TableCell className="font-semibold">{l.username || "—"}</TableCell>
-                <TableCell>
+                <TableCell className="font-semibold text-right">{l.username || "—"}</TableCell>
+                <TableCell className="text-right">
                   <Badge variant="outline">{l.action}</Badge>
                 </TableCell>
-                <TableCell className="text-muted-foreground">{l.detail}</TableCell>
+                <TableCell className="text-muted-foreground text-right">{l.detail}</TableCell>
               </TableRow>
             ))}
             {data.length === 0 && (

@@ -22,6 +22,8 @@ export default function WarehousesPage() {
   const qc = useQueryClient();
   const { refreshWarehouses } = useApp();
   const [open, setOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [name, setName] = useState("");
 
   const { data: warehouses = [] } = useQuery({
@@ -47,6 +49,8 @@ export default function WarehousesPage() {
       toast({ title: "تم الحذف" });
       qc.invalidateQueries({ queryKey: ["warehouses-page"] });
       void refreshWarehouses();
+      setDeleteOpen(false);
+      setSelectedWarehouse(null);
     },
     onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
   });
@@ -105,8 +109,8 @@ export default function WarehousesPage() {
                 size="icon"
                 variant="ghost"
                 onClick={() => {
-                  if (confirm(`حذف المخزن ${w.name}؟ المنتجات والحركات لن تُحذف.`))
-                    deleteMut.mutate(w.id);
+                  setSelectedWarehouse(w);
+                  setDeleteOpen(true);
                 }}
               >
                 <Trash2 className="size-4 text-destructive" />
@@ -115,6 +119,42 @@ export default function WarehousesPage() {
           </Card>
         ))}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تأكيد حذف المخزن</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              هل أنت متأكد من أنك تريد حذف المخزن "<span className="font-semibold text-foreground">{selectedWarehouse?.name}</span>"؟
+            </p>
+            <p className="text-sm text-muted-foreground">
+              📦 المنتجات والحركات لن تُحذف وستبقى في النظام
+            </p>
+            <p className="text-sm text-destructive">
+              ⚠️ هذا الإجراء لا يمكن التراجع عنه
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              إلغاء
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (selectedWarehouse) {
+                  deleteMut.mutate(selectedWarehouse.id);
+                }
+              }}
+              disabled={deleteMut.isPending}
+            >
+              حذف
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

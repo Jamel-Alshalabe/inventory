@@ -4,13 +4,9 @@ import { api, fmtDate, fmtMoney, type DashboardStats } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import {
   Package,
-  AlertTriangle,
-  XCircle,
-  TrendingUp,
-  TrendingDown,
   DollarSign,
   FileText,
-  Boxes,
+  TrendingUp,
 } from "lucide-react";
 import {
   Table,
@@ -22,24 +18,15 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import { Bar } from "react-chartjs-2";
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
 
 function StatCard({
   label,
@@ -89,200 +76,209 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6 p-6" style={{background: "linear-gradient(135deg, #08081a 0%, #0d0d1a 50%, #121230 100%)", minHeight: "100vh"}}>
-      <div className="flex items-center justify-between">
+    <div className="space-y-6" style={{background: "linear-gradient(135deg, #08081a 0%, #0d0d1a 50%, #121230 100%)", minHeight: "100vh"}}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">لوحة التحكم</h1>
-          <p className="text-slate-400 text-sm mt-1">نظرة عامة على نشاط المخزن</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">لوحة التحكم</h1>
+          <p className="text-slate-400 text-sm mt-1">نظرة عامة على نشاط المخزون</p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-slate-400">
-          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-          <span>مباشر</span>
-        </div>
+       
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="إجمالي المنتجات" value={String(data.totalProducts)} icon={Package} />
         <StatCard
-          label="قيمة المخزون"
+          label="إجمالي المخزون"
           value={fmtMoney(data.stockValue, currency)}
           icon={DollarSign}
           tone="accent"
         />
-        <StatCard label="عدد القطع" value={String(data.totalQuantity)} icon={Boxes} />
-        <StatCard label="إجمالي المبيعات" value={fmtMoney(data.totalSales, currency)} icon={FileText} tone="accent" />
         <StatCard
-          label="منتجات منخفضة"
-          value={String(data.lowStock)}
-          icon={AlertTriangle}
-          tone="warning"
-        />
-        <StatCard
-          label="نفد المخزون"
-          value={String(data.outOfStock)}
-          icon={XCircle}
-          tone="destructive"
-        />
-        <StatCard
-          label="وارد اليوم"
-          value={fmtMoney(data.todayIn, currency)}
-          icon={TrendingDown}
+          label="إجمالي المبيعات"
+          value={fmtMoney(data.totalSales, currency)}
+          icon={FileText}
           tone="accent"
         />
         <StatCard
-          label="صادر اليوم"
-          value={fmtMoney(data.todayOut, currency)}
+          label="الأرباح"
+          value={fmtMoney(Math.max(0, data.totalSales - data.stockValue), currency)}
           icon={TrendingUp}
-          tone="warning"
+          tone="primary"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="p-6 lg:col-span-2 bg-gradient-to-br from-[#0f0f23] to-[#1a1a2e] border border-slate-700/50 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-bold text-lg text-white">أكثر المنتجات مبيعاً</h2>
-            <div className="text-xs text-slate-400 bg-slate-800/50 px-3 py-1 rounded-full">هذا الشهر</div>
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+        <Card className="p-4 sm:p-6 bg-gradient-to-br from-[#0f0f23] to-[#1a1a2e] border border-slate-700/50 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-2">
+            <h2 className="font-bold text-lg text-white">تحليل الحركات</h2>
+            <div className="text-xs text-slate-400 bg-slate-800/50 px-3 py-1 rounded-full w-fit">هذا الشهر</div>
           </div>
-          {data.topProducts.length === 0 ? (
-            <div className="text-sm text-slate-400 py-12 text-center">no data</div>
+          
+          {/* Legend */}
+          <div className="flex items-center gap-6 mb-4">
+            <div className="grid grid-cols-1 xl:grid-cols-1 gap-6">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-emerald-500 rounded-sm"></div>
+                <span className="text-sm text-slate-300">وارد</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-orange-500 rounded-sm"></div>
+                <span className="text-sm text-slate-300">صادر</span>
+              </div>
+            </div>
+          </div>
+
+          {data.dailyMovements && data.dailyMovements.length > 0 ? (
+            <div style={{ height: "300px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={data.dailyMovements}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={{ stroke: "#334155" }}
+                  />
+                  <YAxis
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={{ stroke: "#334155" }}
+                    domain={[0, 1]}
+                    ticks={[0, 0.2, 0.4, 0.6, 0.8, 1.0]}
+                    tickFormatter={(value: number) => value.toFixed(1)}
+                  />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "8px",
+                      color: "#f8fafc",
+                    }}
+                    cursor={{ fill: "#1e293b", opacity: 0.4 }}
+                  />
+                  <Bar
+                    dataKey="in"
+                    name="وارد"
+                    fill="#10b981"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="out"
+                    name="صادر"
+                    fill="#fbbf24"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
-            <div style={{ height: "300px", position: "relative" }}>
-              <Bar
-                data={{
-                  labels: data.topProducts.map(p => p.productName),
-                  datasets: [
-                    {
-                      label: "Quantity",
-                      data: data.topProducts.map(p => p.quantity),
-                      backgroundColor: "rgba(37, 99, 235, 0.8)",
-                      borderColor: "rgba(29, 78, 216, 1)",
-                      borderWidth: 2,
-                      borderRadius: 12,
-                      borderSkipped: false,
-                    }
-                  ]
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      display: false
-                    },
-                    tooltip: {
-                      backgroundColor: "#1F2937",
-                      titleColor: "#F9FAFB",
-                      bodyColor: "#F9FAFB",
-                      borderColor: "#4B5563",
-                      borderWidth: 2,
-                      padding: 12,
-                      cornerRadius: 12,
-                      displayColors: false,
-                      callbacks: {
-                        label: function(context) {
-                          return `Quantity: ${context.parsed.y}`;
-                        }
-                      }
-                    }
-                  },
-                  scales: {
-                    x: {
-                      grid: {
-                        color: "#4B5563"
-                      },
-                      ticks: {
-                        color: "#D1D5DB",
-                        font: {
-                          size: 12,
-                          weight: "bold"
-                        }
-                      }
-                    },
-                    y: {
-                      grid: {
-                        color: "#4B5563"
-                      },
-                      ticks: {
-                        color: "#D1D5DB",
-                        font: {
-                          size: 12,
-                          weight: "bold"
-                        }
-                      },
-                      beginAtZero: true
-                    }
-                  }
-                }}
-              />
+            <div style={{ height: "300px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={[
+                    { date: "أبريل 16", in: 0, out: 0 },
+                    { date: "أبريل 17", in: 0, out: 0 },
+                    { date: "أبريل 18", in: 0, out: 0 },
+                    { date: "أبريل 19", in: 0, out: 0 },
+                    { date: "أبريل 20", in: 0, out: 0 },
+                    { date: "أبريل 21", in: 0, out: 0 },
+                    { date: "أبريل 22", in: 0, out: 0 },
+                  ]}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={{ stroke: "#334155" }}
+                  />
+                  <YAxis
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={{ stroke: "#334155" }}
+                    domain={[0, 1]}
+                    ticks={[0, 0.2, 0.4, 0.6, 0.8, 1.0]}
+                    tickFormatter={(value: number) => value.toFixed(1)}
+                  />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "8px",
+                      color: "#f8fafc",
+                    }}
+                    cursor={{ fill: "#1e293b", opacity: 0.4 }}
+                  />
+                  <Bar
+                    dataKey="in"
+                    name="وارد"
+                    fill="#10b981"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="out"
+                    name="صادر"
+                    fill="#f97316"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           )}
         </Card>
-        <Card className="p-6 bg-gradient-to-br from-[#0f0f23] to-[#1a1a2e] border border-slate-700/50 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-          <h2 className="font-bold text-lg text-white mb-4">آخر الحركات</h2>
-          <div className="space-y-3 max-h-[260px] overflow-y-auto">
-            {data.recentMovements.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-12 text-center">لا توجد حركات</div>
-            ) : (
-              data.recentMovements.map((m) => (
-                <div key={m.id} className="flex items-center justify-between gap-3 text-sm">
-                  <div className="min-w-0">
-                    <div className="font-semibold truncate text-white">{m.productName}</div>
-                    <div className="text-xs text-slate-400">{fmtDate(m.createdAt)}</div>
-                  </div>
-                  <Badge
-                    variant={m.type === "in" ? "default" : "destructive"}
-                    className={m.type === "in" ? "bg-accent text-accent-foreground" : ""}
-                  >
-                    {m.type === "in" ? `+${m.quantity}` : `-${m.quantity}`}
-                  </Badge>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
       </div>
 
-      <div className="bg-[#16162b] rounded-xl border border-slate-700/50 p-5">
+      <div className="bg-[#16162b] rounded-xl border border-slate-700/50 p-4 sm:p-5">
         <h3 className="text-lg font-bold text-white mb-4">آخر الحركات (تفصيلي)</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#1a1a2e] text-slate-300">
-                <th className="px-4 py-3 text-right font-medium">التاريخ</th>
-                <th className="px-4 py-3 text-right font-medium">النوع</th>
-                <th className="px-4 py-3 text-right font-medium">المنتج</th>
-                <th className="px-4 py-3 text-right font-medium">الكمية</th>
-                <th className="px-4 py-3 text-right font-medium">السعر</th>
-                <th className="px-4 py-3 text-right font-medium">الإجمالي</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.recentMovements.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-slate-400 text-sm text-center py-4">لا توجد حركات بعد</td>
+        <div className="overflow-x-auto custom-scrollbar">
+          <div className="min-w-[600px]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[#1a1a2e] text-slate-300">
+                  <th className="px-3 sm:px-4 py-3 text-right font-medium whitespace-nowrap">التاريخ</th>
+                  <th className="px-3 sm:px-4 py-3 text-right font-medium whitespace-nowrap">النوع</th>
+                  <th className="px-3 sm:px-4 py-3 text-right font-medium whitespace-nowrap">المنتج</th>
+                  <th className="px-3 sm:px-4 py-3 text-right font-medium whitespace-nowrap">الكمية</th>
+                  <th className="px-3 sm:px-4 py-3 text-right font-medium whitespace-nowrap">السعر</th>
+                  <th className="px-3 sm:px-4 py-3 text-right font-medium whitespace-nowrap">الإجمالي</th>
                 </tr>
-              ) : (
-                data.recentMovements.map((m) => (
-                  <tr key={m.id} className="border-t border-slate-700/50">
-                    <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(m.createdAt)}</td>
-                    <td className="px-4 py-3">
-                      <span className={
-                        m.type === "in"
-                          ? "px-2 py-1 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400"
-                          : "px-2 py-1 rounded text-xs font-semibold bg-red-500/10 text-red-400"
-                      }>
-                        {m.type === "in" ? "وارد" : "صادر"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-white">{m.productName}</td>
-                    <td className="px-4 py-3 text-slate-400">{m.quantity}</td>
-                    <td className="px-4 py-3 text-slate-400">{fmtMoney(m.price, currency)}</td>
-                    <td className="px-4 py-3 text-white font-mono font-bold">{fmtMoney(m.total, currency)}</td>
+              </thead>
+              <tbody>
+                {data.recentMovements.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-slate-400 text-sm text-center py-4">لا توجد حركات بعد</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  data.recentMovements.map((m) => (
+                    <tr key={m.id} className="border-t border-slate-700/50">
+                      <td className="px-3 sm:px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{fmtDate(m.createdAt)}</td>
+                      <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                        <span className={
+                          m.type === "in"
+                            ? "px-2 py-1 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400"
+                            : "px-2 py-1 rounded text-xs font-semibold bg-red-500/10 text-red-400"
+                        }>
+                          {m.type === "in" ? "وارد" : "صادر"}
+                        </span>
+                      </td>
+                      <td className="px-3 sm:px-4 py-3 text-white whitespace-nowrap">{m.productName}</td>
+                      <td className="px-3 sm:px-4 py-3 text-slate-400 whitespace-nowrap">{m.quantity}</td>
+                      <td className="px-3 sm:px-4 py-3 text-slate-400 whitespace-nowrap">{fmtMoney(m.price, currency)}</td>
+                      <td className="px-3 sm:px-4 py-3 text-white font-mono font-bold whitespace-nowrap">{fmtMoney(m.total, currency)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
         <p className="text-slate-400 text-sm text-center py-4 hidden">لا توجد حركات بعد</p>
       </div>

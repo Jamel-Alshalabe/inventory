@@ -21,23 +21,112 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
+import { useConfirmation } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2 } from "lucide-react";
+import { ColumnDef } from "@tanstack/react-table";
+
+function getMovementColumns(
+  type: "in" | "out",
+  currency: string,
+  canEdit: boolean,
+  deleteMut: any,
+  confirm: (options: { title: string; description: string; onConfirm: () => void }) => void
+): ColumnDef<Movement>[] {
+  return [
+    {
+      accessorKey: "productCode",
+      header: "الكود",
+      cell: ({ row }) => (
+        <div className="font-mono text-xs">{row.getValue("productCode")}</div>
+      ),
+    },
+    {
+      accessorKey: "productName",
+      header: "المنتج",
+      cell: ({ row }) => (
+        <div className="font-semibold">{row.getValue("productName")}</div>
+      ),
+    },
+    {
+      accessorKey: "quantity",
+      header: "الكمية",
+      cell: ({ row }) => {
+        const quantity = row.getValue("quantity") as number;
+        return (
+          <Badge
+            className={
+              type === "in"
+                ? "bg-accent text-accent-foreground"
+                : "bg-destructive text-destructive-foreground"
+            }
+          >
+            {type === "in" ? "+" : "-"}
+            {quantity}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "price",
+      header: "السعر",
+      cell: ({ row }) => {
+        const price = parseFloat(row.getValue("price"));
+        return <div>{fmtMoney(price, currency)}</div>;
+      },
+    },
+    {
+      accessorKey: "total",
+      header: "الإجمالي",
+      cell: ({ row }) => {
+        const total = parseFloat(row.getValue("total"));
+        return <div className="font-semibold">{fmtMoney(total, currency)}</div>;
+      },
+    },
+    {
+      accessorKey: "createdAt",
+      header: "التاريخ",
+      cell: ({ row }) => (
+        <div className="text-muted-foreground text-xs">{fmtDate(row.getValue("createdAt"))}</div>
+      ),
+    },
+    {
+      id: "actions",
+      header: "إجراءات",
+      cell: ({ row }) => {
+        const movement = row.original;
+        
+        if (!canEdit) return null;
+        
+        return (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => {
+              confirm({
+                title: "حذف الحركة",
+                description: `هل أنت متأكد من حذف حركة ${type === "in" ? "الوارد" : "الصادر"} للمنتج "${movement.productName}"؟ هذا الإجراء لا يمكن التراجع عنه.`,
+                onConfirm: () => deleteMut.mutate(movement.id),
+              });
+            }}
+            data-testid={`button-delete-${movement.id}`}
+          >
+            <Trash2 className="size-4 text-destructive" />
+          </Button>
+        );
+      },
+    },
+  ];
+}
 
 export default function MovementsPage({ type }: { type: "in" | "out" }) {
   const { selectedWarehouseId, user, settings } = useApp();
   const currency = settings.currency || "ج.م";
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { confirm, ConfirmationComponent } = useConfirmation();
   const canEdit = user?.role === "admin" || user?.role === "user";
   const [open, setOpen] = useState(false);
   const [productCode, setProductCode] = useState("");
@@ -180,64 +269,16 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
       </div>
 
       <Card className="p-5">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>الكود</TableHead>
-              <TableHead>المنتج</TableHead>
-              <TableHead>الكمية</TableHead>
-              <TableHead>السعر</TableHead>
-              <TableHead>الإجمالي</TableHead>
-              <TableHead>التاريخ</TableHead>
-              {canEdit && <TableHead className="w-20"></TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {movements.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={canEdit ? 7 : 6} className="text-center text-muted-foreground py-12">
-                  لا توجد حركات
-                </TableCell>
-              </TableRow>
-            )}
-            {movements.map((m) => (
-              <TableRow key={m.id} data-testid={`row-movement-${m.id}`}>
-                <TableCell className="font-mono text-xs">{m.productCode}</TableCell>
-                <TableCell className="font-semibold">{m.productName}</TableCell>
-                <TableCell>
-                  <Badge
-                    className={
-                      type === "in"
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-destructive text-destructive-foreground"
-                    }
-                  >
-                    {type === "in" ? "+" : "-"}
-                    {m.quantity}
-                  </Badge>
-                </TableCell>
-                <TableCell>{fmtMoney(m.price, currency)}</TableCell>
-                <TableCell className="font-semibold">{fmtMoney(m.total, currency)}</TableCell>
-                <TableCell className="text-muted-foreground text-xs">{fmtDate(m.createdAt)}</TableCell>
-                {canEdit && (
-                  <TableCell>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => {
-                        if (confirm("حذف هذه الحركة؟")) deleteMut.mutate(m.id);
-                      }}
-                      data-testid={`button-delete-${m.id}`}
-                    >
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={getMovementColumns(type, currency, canEdit, deleteMut, confirm)}
+          data={movements}
+          searchKey="productName"
+          searchPlaceholder="بحث بالاسم أو الكود..."
+          emptyMessage="لا توجد حركات"
+        />
       </Card>
+      
+      <ConfirmationComponent isLoading={deleteMut.isPending} />
     </div>
   );
 }
