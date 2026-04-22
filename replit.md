@@ -1,27 +1,46 @@
-# Workspace
+# شركة سنك — Sink Inventory
 
-## Overview
-
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Arabic (RTL) inventory management system for a car-parts company.
+Dark navy theme, Noto Kufi Arabic font, right-side sidebar, full role-based access.
 
 ## Stack
+- pnpm monorepo
+- Backend: Express + drizzle-orm + node-postgres + express-session
+- Frontend: React + Vite + TanStack Query + wouter + shadcn/ui + Tailwind + Recharts + xlsx
+- DB: Replit PostgreSQL (DATABASE_URL)
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+## Artifacts
+- `artifacts/api-server` — Express API (port from `PORT`, base `/api`)
+- `artifacts/snk-inventory` — React frontend mounted at `/`
+- `artifacts/mockup-sandbox` — design sandbox (unused for production app)
 
-## Key Commands
+## Features
+- Auth: login/logout/me, change username/password — express-session, custom hash (no bcrypt)
+- Roles: `admin` (full), `user` (locked to assigned warehouse), `auditor` (read-only)
+- Products: CRUD + search + Excel import/export (xlsx)
+- Movements: in/out per warehouse, auto-updates product stock, reverse on delete
+- Invoices: multi-line, auto-deducts stock, generates print HTML
+- Warehouses: admin-only CRUD
+- Users: admin-only CRUD with role + assigned warehouse
+- Settings: company info + currency
+- Logs: append-only audit trail
+- Reports: sales / stock / profit with date filtering, charts, Excel export, print
+- Dashboard: stats grid, top products bar chart, recent movements
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+## Default Accounts (seeded on first run)
+- admin / admin123
+- user / user123 (assigned to المخزن الرئيسي)
+- auditor / auditor123
 
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+## Key files
+- `lib/db/src/schema/index.ts` — drizzle schema
+- `lib/api-spec/openapi.yaml` — OpenAPI spec (codegen target)
+- `lib/api-zod/src/index.ts` — must remain `export * from "./generated/api"` only
+- `artifacts/api-server/src/lib/{session,auth}.ts` — session + auth helpers
+- `artifacts/api-server/src/routes/*` — all route handlers
+- `artifacts/api-server/src/seed.ts` — seeds initial data idempotently
+- `artifacts/snk-inventory/src/lib/{api,app-context}.tsx` — client + global state
+
+## Constraints
+- `RECORD_LIMIT = 999` total records (products + movements + invoices)
+- Non-admin users with an assigned warehouse have it forced server-side

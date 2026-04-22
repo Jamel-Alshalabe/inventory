@@ -1,36 +1,680 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Sink Company Inventory API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: products
+  - name: movements
+  - name: invoices
+  - name: warehouses
+  - name: users
+  - name: settings
+  - name: logs
+  - name: dashboard
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
           content:
             application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MeResponse" }
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      parameters:
+        - in: query
+          name: warehouseId
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dashboard" }
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      parameters:
+        - in: query
+          name: warehouseId
+          schema: { type: integer }
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
               schema:
-                $ref: "#/components/schemas/HealthStatus"
+                type: array
+                items: { $ref: "#/components/schemas/Product" }
+    post:
+      operationId: createProduct
+      tags: [products]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProductBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+  /products/bulk:
+    post:
+      operationId: bulkCreateProducts
+      tags: [products]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [products]
+              properties:
+                warehouseId: { type: integer }
+                products:
+                  type: array
+                  items: { $ref: "#/components/schemas/CreateProductBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkResult" }
+  /products/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: integer }
+    put:
+      operationId: updateProduct
+      tags: [products]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProductBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+    delete:
+      operationId: deleteProduct
+      tags: [products]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /movements:
+    get:
+      operationId: listMovements
+      tags: [movements]
+      parameters:
+        - in: query
+          name: warehouseId
+          schema: { type: integer }
+        - in: query
+          name: type
+          schema: { type: string, enum: [in, out, all] }
+        - in: query
+          name: from
+          schema: { type: string }
+        - in: query
+          name: to
+          schema: { type: string }
+        - in: query
+          name: productCode
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Movement" }
+    post:
+      operationId: createMovement
+      tags: [movements]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateMovementBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Movement" }
+  /movements/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: deleteMovement
+      tags: [movements]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /invoices:
+    get:
+      operationId: listInvoices
+      tags: [invoices]
+      parameters:
+        - in: query
+          name: warehouseId
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Invoice" }
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateInvoiceBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+  /invoices/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: getInvoice
+      tags: [invoices]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+    delete:
+      operationId: deleteInvoice
+      tags: [invoices]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /warehouses:
+    get:
+      operationId: listWarehouses
+      tags: [warehouses]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Warehouse" }
+    post:
+      operationId: createWarehouse
+      tags: [warehouses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Warehouse" }
+  /warehouses/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: deleteWarehouse
+      tags: [warehouses]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SysUser" }
+    post:
+      operationId: createUser
+      tags: [users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateUserBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SysUser" }
+  /users/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { type: string }
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /account/username:
+    put:
+      operationId: changeUsername
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+  /account/password:
+    put:
+      operationId: changePassword
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /logs:
+    get:
+      operationId: listLogs
+      tags: [logs]
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AuditLog" }
+
+  /reports:
+    get:
+      operationId: getReport
+      tags: [dashboard]
+      parameters:
+        - in: query
+          name: warehouseId
+          schema: { type: integer }
+        - in: query
+          name: from
+          schema: { type: string }
+        - in: query
+          name: to
+          schema: { type: string }
+        - in: query
+          name: productCode
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
-        status:
-          type: string
-      required:
-        - status
-
+        status: { type: string }
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+    SysUser:
+      type: object
+      required: [id, username, role]
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        role: { type: string, enum: [admin, user, auditor] }
+        assignedWarehouseId: { type: integer, nullable: true }
+        assignedWarehouseName: { type: string, nullable: true }
+    AuthResponse:
+      type: object
+      required: [user]
+      properties:
+        user: { $ref: "#/components/schemas/SysUser" }
+    MeResponse:
+      type: object
+      properties:
+        user:
+          oneOf:
+            - { $ref: "#/components/schemas/SysUser" }
+            - { type: "null" }
+    CreateUserBody:
+      type: object
+      required: [username, password, role]
+      properties:
+        username: { type: string }
+        password: { type: string }
+        role: { type: string, enum: [admin, user, auditor] }
+        assignedWarehouseId: { type: integer, nullable: true }
+    Warehouse:
+      type: object
+      required: [id, name, productCount]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        productCount: { type: integer }
+    Product:
+      type: object
+      required: [id, name, code, buyPrice, sellPrice, quantity, warehouseId, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        code: { type: string }
+        buyPrice: { type: number }
+        sellPrice: { type: number }
+        quantity: { type: integer }
+        warehouseId: { type: integer }
+        warehouseName: { type: string, nullable: true }
+        createdAt: { type: string }
+    CreateProductBody:
+      type: object
+      required: [name, code, buyPrice, sellPrice, quantity]
+      properties:
+        name: { type: string }
+        code: { type: string }
+        buyPrice: { type: number }
+        sellPrice: { type: number }
+        quantity: { type: integer }
+        warehouseId: { type: integer }
+    UpdateProductBody:
+      type: object
+      properties:
+        name: { type: string }
+        code: { type: string }
+        buyPrice: { type: number }
+        sellPrice: { type: number }
+        quantity: { type: integer }
+    BulkResult:
+      type: object
+      required: [created, skipped]
+      properties:
+        created: { type: integer }
+        skipped: { type: integer }
+    Movement:
+      type: object
+      required: [id, type, productCode, productName, quantity, price, total, warehouseId, createdAt]
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [in, out] }
+        productCode: { type: string }
+        productName: { type: string }
+        quantity: { type: integer }
+        price: { type: number }
+        total: { type: number }
+        warehouseId: { type: integer }
+        warehouseName: { type: string, nullable: true }
+        createdAt: { type: string }
+    CreateMovementBody:
+      type: object
+      required: [type, productCode, quantity, price]
+      properties:
+        type: { type: string, enum: [in, out] }
+        productCode: { type: string }
+        quantity: { type: integer }
+        price: { type: number }
+        warehouseId: { type: integer }
+    InvoiceItem:
+      type: object
+      required: [productCode, productName, quantity, price, total]
+      properties:
+        productCode: { type: string }
+        productName: { type: string }
+        quantity: { type: integer }
+        price: { type: number }
+        total: { type: number }
+    Invoice:
+      type: object
+      required: [id, invoiceNumber, customerName, items, total, status, warehouseId, createdAt]
+      properties:
+        id: { type: integer }
+        invoiceNumber: { type: string }
+        customerName: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InvoiceItem" }
+        total: { type: number }
+        status: { type: string }
+        warehouseId: { type: integer }
+        warehouseName: { type: string, nullable: true }
+        createdAt: { type: string }
+    CreateInvoiceBody:
+      type: object
+      required: [customerName, items]
+      properties:
+        customerName: { type: string }
+        warehouseId: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            required: [productCode, quantity, price]
+            properties:
+              productCode: { type: string }
+              quantity: { type: integer }
+              price: { type: number }
+    AuditLog:
+      type: object
+      required: [id, action, detail, username, createdAt]
+      properties:
+        id: { type: integer }
+        action: { type: string }
+        detail: { type: string }
+        username: { type: string }
+        createdAt: { type: string }
+    Dashboard:
+      type: object
+      required: [totalProducts, totalQuantity, totalSales, profit, recordCount, recordLimit, lowStock, recentMovements, chart]
+      properties:
+        totalProducts: { type: integer }
+        totalQuantity: { type: integer }
+        totalSales: { type: number }
+        profit: { type: number }
+        recordCount: { type: integer }
+        recordLimit: { type: integer }
+        lowStock:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+        recentMovements:
+          type: array
+          items: { $ref: "#/components/schemas/Movement" }
+        chart:
+          type: array
+          items:
+            type: object
+            required: [date, in, out]
+            properties:
+              date: { type: string }
+              in: { type: number }
+              out: { type: number }
+    Report:
+      type: object
+      required: [totalIn, totalOut, totalQuantity, profit, movements]
+      properties:
+        totalIn: { type: number }
+        totalOut: { type: number }
+        totalQuantity: { type: integer }
+        profit: { type: number }
+        movements:
+          type: array
+          items: { $ref: "#/components/schemas/Movement" }

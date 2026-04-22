@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "شركة سنك - نظام المخزون"
+version = "1.0.0"
+id = "artifacts/snk-inventory"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24054
+
+[services.development]
+run = "pnpm --filter @workspace/snk-inventory run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/snk-inventory", "run", "build" ]
+publicDir = "artifacts/snk-inventory/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24054"
+BASE_PATH = "/"

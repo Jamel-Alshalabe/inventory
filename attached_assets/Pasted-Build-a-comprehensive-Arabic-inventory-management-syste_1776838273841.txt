@@ -1,0 +1,104 @@
+Build a comprehensive Arabic inventory management system for "شركة سنك" (Sink Company - Car Parts). Single HTML file, RTL dark theme with blue brand colors.
+
+TECHNICAL STACK:
+- Tailwind CSS 3.4.17, Lucide Icons, Chart.js 3.9.1, html2pdf.js, xlsx.js
+- Fonts: Noto Kufi Arabic, JetBrains Mono
+- Replit SDKs: /_sdk/element_sdk.js (theming), /_sdk/data_sdk.js (data)
+
+DESIGN SYSTEM:
+Colors: brand-500:#1a56db, dark-900:#08081a, dark-700:#111127
+Layout: RTL, responsive, dark theme with custom scrollbar
+
+AUTHENTICATION (Role-Based):
+- admin/admin123 → Full access, all warehouses, user management
+- user1/user123 → Assigned to "الرئيسي" warehouse only, limited menu
+- auditor/audit123 → View reports/logs only, can switch warehouses
+- Support creating additional users via SDK
+
+CORE PAGES & FEATURES:
+
+1. LOGIN: Gradient background, username/password form, error handling
+
+2. DASHBOARD: 
+   - Stats: Total products, stock quantity, sales count, profit
+   - Chart.js bar chart (In vs Out movements)
+   - Alerts: Low stock (≤5), record limit warning (900/999)
+   - Recent movements table (last 10)
+
+3. PRODUCTS:
+   - CRUD: name, code, buy_price, sell_price, quantity
+   - Search by name/code
+   - Excel import (.xlsx/.xls) with preview and validation
+   - Duplicate prevention
+
+4. MOVEMENTS:
+   - Record In (purchase) / Out (sale)
+   - Auto-update product quantities
+   - Filter by type (All/In/Out)
+   - Delete with quantity reversal
+
+5. INVOICES:
+   - Multi-item invoices
+   - Auto-calculate totals
+   - Print-friendly invoice viewer
+   - Export/Print PDF
+
+6. REPORTS:
+   - Periods: Week, Month, Year, All
+   - Custom date range
+   - Quick report modal
+   - Product-specific report
+   - Export to PDF/Excel
+   - Summary statistics
+
+7. WAREHOUSES (Admin only):
+   - Create/switch warehouses
+   - Isolated data per warehouse
+
+8. USERS (Admin only):
+   - Create with role (admin/user/auditor)
+   - Assign warehouse
+
+9. SETTINGS:
+   - Currency selector (20+ currencies, default SDG)
+   - Company phone/location
+   - Change username/password
+   - Data backup: CSV export, PDF print, direct print
+   - Record count with limit warning
+
+10. LOGS: Operation history with user tracking
+
+DATA MODEL (SDK):
+- product: name, code, buy_price, sell_price, quantity, warehouse, date
+- movement: movement_type(in/out), product_code, movement_qty, movement_price, warehouse, date
+- invoice: invoice_number, customer_name, invoice_items(JSON), invoice_total, invoice_date, warehouse
+- warehouse: name
+- sys_user: username, password_hash, role, assigned_warehouse
+- setting: setting_key, setting_value
+- log: log_action, log_detail, log_user, log_date
+
+REQUIRED FUNCTIONS:
+- Authentication with built-in users + SDK users
+- Currency formatting (cs(), fmt())
+- Toast notifications (success/error/warning)
+- Modal system (show/hide)
+- Delete confirmation
+- Navigation with role-based menu hiding
+- Warehouse switching
+- Chart rendering
+- Excel parsing with xlsx.js
+- PDF generation with html2pdf.js
+- All CRUD via window.dataSdk (create/update/delete)
+- addLog() for audit trail
+
+INITIALIZATION:
+- window.elementSdk.init() for theming
+- window.dataSdk.init() for data loading
+- lucide.createIcons() after DOM updates
+
+CONSTRAINTS:
+- Max 999 records total
+- Check record limit before create
+- RTL layout (dir="rtl")
+- Mobile responsive
+- Built-in users array as fallback
