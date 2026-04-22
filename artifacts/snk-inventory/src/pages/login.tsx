@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, LogIn } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useApp();
@@ -27,34 +27,36 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background" dir="rtl">
-      <Card className="w-full max-w-md p-8">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{background: "linear-gradient(135deg,#08081a 0%,#1a1a2e 50%,#0a246b 100%)"}} dir="rtl">
+      <Card className="w-full max-w-md p-8 bg-[#16162b] shadow-[0_8px_32px_0_rgba(31,38,135,0.37)] backdrop-blur-md">
         <div className="text-center mb-6">
-          <div className="size-14 mx-auto rounded-xl bg-primary/15 text-primary flex items-center justify-center text-2xl font-bold mb-3">
+          <div className="size-20 mx-auto rounded-xl bg-primary/15 text-primary flex items-center justify-center text-2xl font-bold mb-3">
             سنك
           </div>
-          <h1 className="text-2xl font-bold">شركة سنك</h1>
-          <p className="text-muted-foreground text-sm mt-1">نظام إدارة مخزون قطع غيار السيارات</p>
+          <h1 className="text-2xl font-bold text-slate-100">شركة سنك</h1>
+          <p className="text-slate-400 text-sm mt-1">نظام إدارة مخزون قطع غيار السيارات</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>اسم المستخدم</Label>
+            <Label className="text-slate-400 mb-2">اسم المستخدم</Label>
             <Input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
               autoFocus
               data-testid="input-username"
+              className="bg-[#0e0c20] text-white "
             />
           </div>
           <div className="space-y-2">
-            <Label>كلمة المرور</Label>
+            <Label className="text-slate-400">كلمة المرور</Label>
             <Input
-              type="password"
+              type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               data-testid="input-password"
+              className="bg-[#0e0c20] text-white "
             />
           </div>
           {err && (
@@ -65,17 +67,13 @@ export default function LoginPage() {
               {err}
             </div>
           )}
-          <Button type="submit" className="w-full" disabled={loading} data-testid="button-login">
+          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading} data-testid="button-login">
+            {!loading && <LogIn className="size-4 ml-2" />}
             {loading && <Loader2 className="size-4 animate-spin ml-2" />}
-            دخول
+            تسجيل الدخول
           </Button>
         </form>
-        <div className="mt-6 text-xs text-muted-foreground bg-muted/40 rounded-md p-3">
-          <div className="font-semibold mb-1">حسابات تجريبية:</div>
-          <div>المدير: admin / admin123</div>
-          <div>مستخدم: user / user123</div>
-          <div>مراجع: auditor / auditor123</div>
-        </div>
+       
       </Card>
     </div>
   );

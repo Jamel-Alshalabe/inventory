@@ -8,7 +8,15 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      // If response is not JSON, throw a more descriptive error
+      throw new Error(`API returned non-JSON response: ${text.substring(0, 100)}...`);
+    }
+  }
   if (!res.ok) {
     const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
     throw new Error(msg);

@@ -3,14 +3,22 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "build": "npm run typecheck && npm run build:frontend && npm run build:api",
+    "build:frontend": "cd artifacts/snk-inventory && npm run build",
+    "build:api": "cd artifacts/api-server && npm run build",
+    "dev": "npm run dev:api & npm run dev:frontend",
+    "dev:frontend": "cd artifacts/snk-inventory && cross-env PORT=3000 BASE_PATH=/ npm run dev",
+    "dev:api": "cd artifacts/api-server && cross-env PORT=3001 npm run mock",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "npm run typecheck:libs && npm run typecheck:frontend && npm run typecheck:api",
+    "typecheck:frontend": "cd artifacts/snk-inventory && npm run typecheck",
+    "typecheck:api": "cd artifacts/api-server && npm run typecheck",
+    "install:all": "npm install && cd artifacts/snk-inventory && npm install && cd ../api-server && npm install"
   },
   "private": true,
   "devDependencies": {
     "typescript": "~5.9.2",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "cross-env": "^7.0.3"
   }
 }
