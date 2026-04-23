@@ -1,6 +1,6 @@
 // Dashboard Service for Laravel Backend Integration
-import { apiClient } from './api-client';
-import type { DashboardStats } from './api-client';
+import { api } from './api';
+import type { DashboardStats } from './api';
 
 export class DashboardService {
   private static instance: DashboardService;
@@ -15,12 +15,12 @@ export class DashboardService {
   }
 
   public async getDashboardStats(warehouseId?: number): Promise<DashboardStats> {
-    return apiClient.getDashboardStats(warehouseId);
+    return api.getDashboard(warehouseId ? { warehouse_id: warehouseId } : undefined);
   }
 
   public async getTopProducts(warehouseId?: number, limit: number = 10) {
     // Use the dashboard stats which includes top products
-    const stats = await apiClient.getDashboardStats(warehouseId);
+    const stats = await api.getDashboard(warehouseId ? { warehouse_id: warehouseId } : undefined);
     return stats.topProducts.slice(0, limit);
   }
 
@@ -29,17 +29,19 @@ export class DashboardService {
     const endDate = new Date().toISOString().split('T')[0];
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    return apiClient.getMovementsReport({ 
-      warehouse_id: warehouseId,
+    return api.getReport({ 
+      type: 'movements',
       start_date: startDate,
-      end_date: endDate
+      end_date: endDate,
+      warehouse_id: warehouseId
     });
   }
 
   public async getStockSummary(warehouseId?: number) {
     // Use the stock report API method with correct parameters
-    return apiClient.getStockReport({ 
-      warehouse_id: warehouseId 
+    return api.getReport({ 
+      type: 'stock',
+      warehouse_id: warehouseId
     });
   }
 }

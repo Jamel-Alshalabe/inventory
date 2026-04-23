@@ -1,5 +1,5 @@
 // Authentication Service for Laravel Sanctum
-import { apiClient } from './api-client';
+import { api } from './api';
 
 export interface LoginCredentials {
   username: string;
@@ -48,7 +48,7 @@ export class AuthService {
 
   public async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await apiClient.login(credentials);
+      const response = await api.login(credentials);
       this.saveToken(response.token);
       return response;
     } catch (error) {
@@ -59,7 +59,7 @@ export class AuthService {
 
   public async logout(): Promise<void> {
     try {
-      await apiClient.logout();
+      await api.logout();
     } finally {
       this.removeToken();
     }
@@ -67,7 +67,7 @@ export class AuthService {
 
   public async getCurrentUser() {
     try {
-      return await apiClient.getCurrentUser();
+      return await api.getMe();
     } catch (error) {
       this.removeToken();
       throw error;

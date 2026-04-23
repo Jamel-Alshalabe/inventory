@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { apiClient, type AuthUser, type Warehouse } from "./api-client";
+import { api, type AuthUser, type Warehouse } from "./api";
 
 type AppContextValue = {
   user: AuthUser | null;
@@ -25,6 +25,24 @@ type AppContextValue = {
 
 const Ctx = createContext<AppContextValue | null>(null);
 
+// Helper functions for localStorage
+const saveUserToStorage = (user: AuthUser | null) => {
+  if (user) {
+    localStorage.setItem('snk:user', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('snk:user');
+  }
+};
+
+const loadUserFromStorage = (): AuthUser | null => {
+  try {
+    const stored = localStorage.getItem('snk:user');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,17 +58,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const user = await apiClient.getCurrentUser();
-      setUser(user);
+      const userResponse = await api.getMe();
+      // Convert API response to AuthUser format
+      if (userResponse.user) {
+        const authUser: AuthUser = {
+          id: userResponse.user.id,
+          username: userResponse.user.username,
+          role: userResponse.user.role,
+          permissions: [], // TODO: Get permissions from backend or calculate based on role
+          assignedWarehouseId: userResponse.user.assignedWarehouseId ?? null,
+          assignedWarehouseName: userResponse.user.assignedWarehouseName ?? null,
+        };
+        setUser(authUser);
+        saveUserToStorage(authUser);
+      } else {
+        setUser(null);
+        saveUserToStorage(null);
+      }
     } catch (error) {
       // User is not authenticated - this is normal on initial load
       setUser(null);
+      saveUserToStorage(null);
     }
   }, []);
 
   const refreshWarehouses = useCallback(async () => {
     try {
-      const ws = await apiClient.getWarehouses();
+      const ws = await api.listWarehouses();
       setWarehouses(ws);
     } catch {
       setWarehouses([]);
@@ -59,7 +93,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshSettings = useCallback(async () => {
     try {
-      const s = await apiClient.getSettings();
+      const s = await api.getSettings();
       setSettings(s);
     } catch {
       setSettings({});
@@ -68,16 +102,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (username: string, password: string) => {
-      const response = await apiClient.login({ username, password });
-      setUser(response.user);
+      const response = await api.login({ username, password });
+      // Convert API response to AuthUser format
+      const authUser: AuthUser = {
+        id: response.user.id,
+        username: response.user.username,
+        role: response.user.role,
+        permissions: (response.user as any).permissions || [], // Copy permissions from API response
+        assignedWarehouseId: response.user.assignedWarehouseId ?? null,
+        assignedWarehouseName: response.user.assignedWarehouseName ?? null,
+      };
+      setUser(authUser);
+      saveUserToStorage(authUser);
       await Promise.all([refreshWarehouses(), refreshSettings()]);
     },
     [refreshWarehouses, refreshSettings],
   );
 
   const logout = useCallback(async () => {
-    await apiClient.logout();
+    await api.logout();
     setUser(null);
+    saveUserToStorage(null);
     setWarehouses([]);
     setSelectedWarehouseId(null);
   }, [setSelectedWarehouseId]);
@@ -90,6 +135,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         if (isMounted) {
+          // First, try to load user from localStorage for instant UI
+          const storedUser = loadUserFromStorage();
+          if (storedUser) {
+            setUser(storedUser);
+          }
+          
+          // Then verify with API to get fresh data
           await refreshUser();
         }
       } finally {

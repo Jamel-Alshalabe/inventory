@@ -11,6 +11,7 @@ import StockMovementsPage from "@/pages/stock-movements";
 import InvoicesPage from "@/pages/invoices";
 import WarehousesPage from "@/pages/warehouses";
 import UsersPage from "@/pages/users";
+import SubscriptionsPage from "@/pages/subscriptions";
 import SettingsPage from "@/pages/settings";
 import LogsPage from "@/pages/logs";
 import ReportsPage from "@/pages/reports";
@@ -20,15 +21,37 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 });
 
-function AdminOnly({ children }: { children: React.ReactNode }) {
+function PermissionGuard({ 
+  children, 
+  permissions, 
+  requireAny = true 
+}: { 
+  children: React.ReactNode; 
+  permissions: string[]; 
+  requireAny?: boolean; // true = any permission, false = all permissions
+}) {
   const { user } = useApp();
-  if (user?.role !== "admin") {
+  
+  if (!user?.permissions || user.permissions.length === 0) {
     return (
       <div className="text-center py-20 text-muted-foreground">
         ليس لديك صلاحية للوصول لهذه الصفحة
       </div>
     );
   }
+  
+  const hasPermission = requireAny
+    ? permissions.some(permission => user.permissions.includes(permission))
+    : permissions.every(permission => user.permissions.includes(permission));
+    
+  if (!hasPermission) {
+    return (
+      <div className="text-center py-20 text-muted-foreground">
+        ليس لديك صلاحية للوصول لهذه الصفحة
+      </div>
+    );
+  }
+  
   return <>{children}</>;
 }
 
@@ -36,29 +59,37 @@ function Routes() {
   return (
     <Switch>
       <Route path="/" component={DashboardPage} />
+      <Route path="/dashboard" component={DashboardPage} />
       <Route path="/products" component={ProductsPage} />
       <Route path="/stock-movements" component={StockMovementsPage} />
       <Route path="/invoices" component={InvoicesPage} />
       <Route path="/reports" component={ReportsPage} />
       <Route path="/warehouses">
         {() => (
-          <AdminOnly>
+          <PermissionGuard permissions={["manage-warehouses"]}>
             <WarehousesPage />
-          </AdminOnly>
+          </PermissionGuard>
         )}
       </Route>
       <Route path="/users">
         {() => (
-          <AdminOnly>
+          <PermissionGuard permissions={["view-users"]}>
             <UsersPage />
-          </AdminOnly>
+          </PermissionGuard>
+        )}
+      </Route>
+      <Route path="/subscriptions">
+        {() => (
+          <PermissionGuard permissions={["view-subscriptions"]}>
+            <SubscriptionsPage />
+          </PermissionGuard>
         )}
       </Route>
       <Route path="/settings">
         {() => (
-          <AdminOnly>
+          <PermissionGuard permissions={["manage-settings"]}>
             <SettingsPage />
-          </AdminOnly>
+          </PermissionGuard>
         )}
       </Route>
       <Route path="/logs" component={LogsPage} />

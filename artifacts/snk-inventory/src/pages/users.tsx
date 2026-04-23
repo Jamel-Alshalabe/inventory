@@ -44,24 +44,25 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<AuthUser | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "user" | "auditor">("user");
+  const [role, setRole] = useState<"admin" | "user" | "editor">("user");
   const [warehouseId, setWarehouseId] = useState<string>("");
+  
+  // Subscription fields
+  const [planType, setPlanType] = useState<"basic" | "premium" | "enterprise">("basic");
+  const [subscriptionStatus, setSubscriptionStatus] = useState<"active" | "expired" | "cancelled">("active");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [price, setPrice] = useState<string>("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "bank_transfer" | "">("cash");
+  const [subscriptionNotes, setSubscriptionNotes] = useState<string>("");
 
   const { data: users = [] } = useQuery({
     queryKey: ["users"],
     queryFn: () => api.get<AuthUser[]>("/users"),
   });
 
-  // Add dummy data for testing
-  const mockUsers: AuthUser[] = [
-    { id: 1, username: "أحمد محمد", role: "admin", assignedWarehouseId: null, assignedWarehouseName: null },
-    { id: 2, username: "فاطمة علي", role: "user", assignedWarehouseId: 1, assignedWarehouseName: "المخزن الرئيسي" },
-    { id: 3, username: "محمد خالد", role: "auditor", assignedWarehouseId: 2, assignedWarehouseName: "مخزن الفرع" },
-    { id: 4, username: "نورة سعد", role: "user", assignedWarehouseId: null, assignedWarehouseName: null },
-    { id: 5, username: "عبدالله عمر", role: "admin", assignedWarehouseId: 1, assignedWarehouseName: "المخزن الرئيسي" },
-  ];
-
-  const displayUsers = users.length > 0 ? users : mockUsers;
+ 
+  const displayUsers = users.length > 0 ? users : [];
 
   const createMut = useMutation({
     mutationFn: () =>
@@ -147,41 +148,109 @@ export default function UsersPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>الصلاحية</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as typeof role)}>
+                <Label>الدور</Label>
+                <Select value={role} onValueChange={(v) => setRole(v as "admin" | "user" | "editor")}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">مدير</SelectItem>
                     <SelectItem value="user">مستخدم</SelectItem>
-                    <SelectItem value="auditor">مراجع</SelectItem>
+                    <SelectItem value="editor">مراجع حسابات</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            
+            {/* Subscription Fields */}
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="text-lg font-semibold">معلومات الاشتراك</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>نوع الاشتراك</Label>
+                  <Select value={planType} onValueChange={(v) => setPlanType(v as typeof planType)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="basic">أساسي</SelectItem>
+                      <SelectItem value="premium">مميز</SelectItem>
+                      <SelectItem value="enterprise">مؤسسي</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>حالة الاشتراك</Label>
+                  <Select value={subscriptionStatus} onValueChange={(v) => setSubscriptionStatus(v as typeof subscriptionStatus)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">نشط</SelectItem>
+                      <SelectItem value="expired">منتهي</SelectItem>
+                      <SelectItem value="cancelled">ملغي</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>تاريخ البدء</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>تاريخ الانتهاء</Label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>السعر</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>طريقة الدفع</Label>
+                  <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر طريقة الدفع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">نقدي</SelectItem>
+                      <SelectItem value="card">بطاقة ائتمان</SelectItem>
+                      <SelectItem value="bank_transfer">تحويل بنكي</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>المخزن المخصص</Label>
-                <Select value={warehouseId} onValueChange={setWarehouseId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="(جميع المخازن)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {warehouses.map((w) => (
-                      <SelectItem key={w.id} value={String(w.id)}>
-                        {w.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>ملاحظات</Label>
+                <Input
+                  placeholder="ملاحظات إضافية عن الاشتراك"
+                  value={subscriptionNotes}
+                  onChange={(e) => setSubscriptionNotes(e.target.value)}
+                />
               </div>
+            </div>
+            
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>
                 إلغاء
               </Button>
               <Button
-                onClick={() => createMut.mutate()}
-                disabled={!username || !password || createMut.isPending}
+                onClick={() => {
+                  createMut.mutate();
+                }}
+                disabled={!username || createMut.isPending}
                 data-testid="button-save"
               >
                 حفظ
@@ -194,16 +263,17 @@ export default function UsersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>اسم المستخدم</TableHead>
-              <TableHead>الصلاحية</TableHead>
-              <TableHead>المخزن</TableHead>
-              <TableHead className="w-32 text-right">الإجراءات</TableHead>
+              <TableHead className="text-right">الرقم</TableHead>
+              <TableHead className="text-right">اسم المستخدم</TableHead>
+              <TableHead className="text-right">الدور</TableHead>
+              <TableHead className="text-right">الإجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {displayUsers.map((u) => (
               <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
-                <TableCell className="font-semibold">{u.username}</TableCell>
+                <TableCell className="font-medium text-right">{u.id}</TableCell>
+                <TableCell className="font-semibold text-right">{u.username}</TableCell>
                 <TableCell>
                   <Badge
                     className={
@@ -214,14 +284,11 @@ export default function UsersPage() {
                         : "bg-muted"
                     }
                   >
-                    {u.role === "admin" ? "مدير" : u.role === "user" ? "مستخدم" : "مراجع"}
+                    {u.role === "admin" ? "مدير" : u.role === "user" ? "مستخدم" : u.role === "editor" ? "مراجع حسابات" : "مراجع"}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {u.assignedWarehouseName ?? "—"}
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1 justify-end">
+                <TableCell className="text-right">
+                  <div className="flex gap-1 ">
                     <Button
                       size="icon"
                       variant="ghost"
@@ -241,7 +308,6 @@ export default function UsersPage() {
                             setSelectedUser(u);
                             setUsername(u.username);
                             setRole(u.role);
-                            setWarehouseId(u.assignedWarehouseId?.toString() || "");
                             setEditOpen(true);
                           }}
                         >
@@ -293,7 +359,7 @@ export default function UsersPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>الصلاحية</Label>
+              <Label>الدور</Label>
               <Select value={role} onValueChange={(v) => setRole(v as typeof role)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -301,24 +367,102 @@ export default function UsersPage() {
                 <SelectContent>
                   <SelectItem value="admin">مدير</SelectItem>
                   <SelectItem value="user">مستخدم</SelectItem>
-                  <SelectItem value="auditor">مراجع</SelectItem>
+                  <SelectItem value="editor">مراجع حسابات</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>المخزن المخصص</Label>
-              <Select value={warehouseId} onValueChange={setWarehouseId}>
+              <Label>المخزن</Label>
+              <Select value={warehouseId} onValueChange={(v) => setWarehouseId(v as typeof warehouseId)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="(جميع المخازن)" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {warehouses.map((w) => (
-                    <SelectItem key={w.id} value={String(w.id)}>
-                      {w.name}
+                  {warehouses.map((warehouse) => (
+                    <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                      {warehouse.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+          <div className="space-y-4 border-t pt-4">
+            <h3 className="text-lg font-semibold">معلومات الاشتراك</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>نوع الاشتراك</Label>
+                <Select value={planType} onValueChange={(v) => setPlanType(v as typeof planType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basic">أساسي</SelectItem>
+                    <SelectItem value="premium">مميز</SelectItem>
+                    <SelectItem value="enterprise">مؤسسي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>حالة الاشتراك</Label>
+                <Select value={subscriptionStatus} onValueChange={(v) => setSubscriptionStatus(v as typeof subscriptionStatus)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">نشط</SelectItem>
+                    <SelectItem value="expired">منتهي</SelectItem>
+                    <SelectItem value="cancelled">ملغي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>تاريخ البدء</Label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>تاريخ الانتهاء</Label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>السعر</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>طريقة الدفع</Label>
+                <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر طريقة الدفع" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">نقدي</SelectItem>
+                    <SelectItem value="card">بطاقة ائتمان</SelectItem>
+                    <SelectItem value="bank_transfer">تحويل بنكي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>ملاحظات</Label>
+              <Input
+                placeholder="ملاحظات إضافية عن الاشتراك"
+                value={subscriptionNotes}
+                onChange={(e) => setSubscriptionNotes(e.target.value)}
+              />
             </div>
           </div>
           <DialogFooter>
@@ -331,6 +475,16 @@ export default function UsersPage() {
                 ...(password && { password }),
                 role,
                 assignedWarehouseId: warehouseId ? Number(warehouseId) : null,
+                // Subscription data
+                subscription: {
+                  plan_type: planType,
+                  status: subscriptionStatus,
+                  start_date: startDate,
+                  end_date: endDate,
+                  price: parseFloat(price) || 0,
+                  payment_method: paymentMethod || null,
+                  notes: subscriptionNotes || null,
+                }
               })}
               disabled={!username || updateMut.isPending}
               data-testid="button-update"
@@ -354,16 +508,14 @@ export default function UsersPage() {
                 <p className="font-semibold">{selectedUser?.username}</p>
               </div>
               <div>
-                <Label className="text-sm text-muted-foreground">الصلاحية</Label>
+                <Label className="text-sm text-muted-foreground">الدور</Label>
                 <p className="font-semibold">
-                  {selectedUser?.role === "admin" ? "مدير" : 
-                   selectedUser?.role === "user" ? "مستخدم" : "مراجع"}
+                  {(selectedUser?.role as any) === "admin" ? "مدير" : 
+                   (selectedUser?.role as any) === "user" ? "مستخدم" : 
+                   (selectedUser?.role as any) === "editor" ? "مراجع حسابات" : "مراجع"}
                 </p>
               </div>
-              <div>
-                <Label className="text-sm text-muted-foreground">المخزن المخصص</Label>
-                <p className="font-semibold">{selectedUser?.assignedWarehouseName || "جميع المخازن"}</p>
-              </div>
+              
               <div>
                 <Label className="text-sm text-muted-foreground">معرف المستخدم</Label>
                 <p className="font-semibold">#{selectedUser?.id}</p>

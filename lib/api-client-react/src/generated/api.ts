@@ -1882,7 +1882,7 @@ export const getGetSettingsQueryOptions = <
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getSettings>>> = ({
     signal,
-  }) => getSettings({ signal, ...requestOptions });
+  }: { signal?: AbortSignal }) => getSettings({ signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getSettings>>,

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useApp, warehouseQuery } from "@/lib/app-context";
-import { apiClient, fmtDate, fmtMoney, type DashboardStats } from "@/lib/api-client";
+import { api, fmtDate, fmtMoney, type DashboardStats } from "@/lib/api";
 import { dashboardService } from "@/lib/dashboard-service";
 import { Card } from "@/components/ui/card";
 import {

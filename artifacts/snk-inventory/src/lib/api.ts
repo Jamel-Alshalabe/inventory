@@ -15,12 +15,13 @@ export function fmtDate(iso: string): string {
 }
 
 // Export types for compatibility
-export type Role = "admin" | "user" | "auditor";
+export type Role = "admin" | "super_admin" | "user" | "auditor";
 
 export type AuthUser = {
   id: number;
   username: string;
   role: Role;
+  permissions: string[];
   assignedWarehouseId: number | null;
   assignedWarehouseName: string | null;
   email?: string;
@@ -96,4 +97,13 @@ export type DashboardStats = {
   topProducts: { productCode: string; productName: string; quantity: number }[];
   dailyMovements?: { date: string; in: number; out: number }[];
 };
+
+// Configure API base URL from environment variables
+import { setBaseUrl } from "../../../../lib/api-client-react/src";
+setBaseUrl(import.meta.env.VITE_API_BASE_URL);
+
+// Export all API functions as a single 'api' object
+import * as generatedApi from "../../../../lib/api-client-react/src/generated/api";
+
+export const api = generatedApi;
 

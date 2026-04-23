@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { useApp, warehouseQuery } from "@/lib/app-context";
-import { apiClient, fmtMoney, type Product } from "@/lib/api-client";
+import { api, fmtMoney, type Product } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, FileSpreadsheet, Download, Search } from "lucide-react";
 
 type FormState = {
+  id?: number;
   name: string;
   code: string;
   buyPrice: string;
@@ -38,17 +39,18 @@ export default function ProductsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [create, setCreate] = useState<FormState>(empty);
   const qc = useQueryClient();
+  const { confirm } = useConfirmation();
   const { toast } = useToast();
 
   const { data, isLoading } = useQuery({
     queryKey: ["products", selectedWarehouseId],
-    queryFn: () => apiClient.getProducts(selectedWarehouseId || undefined),
+    queryFn: () => api.listProducts(selectedWarehouseId ? { warehouse_id: selectedWarehouseId } : undefined),
     retry: 2,
     staleTime: 30000,
   });
 
   const createMut = useMutation({
-    mutationFn: (data: Omit<Product, "id" | "createdAt" | "warehouseName">) => apiClient.createProduct(data),
+    mutationFn: (data: Omit<Product, "id" | "createdAt" | "warehouseName">) => api.createProduct(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
       setCreateOpen(false);
@@ -68,7 +70,7 @@ export default function ProductsPage() {
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Product> }) => apiClient.updateProduct(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Product> }) => api.updateProduct(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
       setEditOpen(false);
@@ -88,7 +90,7 @@ export default function ProductsPage() {
   });
 
   const deleteMut = useMutation({
-    mutationFn: apiClient.deleteProduct,
+    mutationFn: api.deleteProduct,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
       toast({
@@ -105,40 +107,53 @@ export default function ProductsPage() {
     },
   });
 
-  const confirm = useConfirmation();
-
   const filtered = useMemo(() => {
     if (!data) return [];
     const s = search.trim().toLowerCase();
     return data.filter(
-      (p) =>
+      (p: Product) =>
         p.name.toLowerCase().includes(s) ||
         p.code.toLowerCase().includes(s)
     );
   }, [data, search]);
 
   const handleCreate = () => {
+    if (!selectedWarehouseId) {
+      toast({
+        title: "خطأ",
+        description: "يجب اختيار مستودع أولاً",
+        variant: "destructive",
+      });
+      return;
+    }
     createMut.mutate({
       name: create.name.trim(),
       code: create.code.trim(),
       buyPrice: Number(create.buyPrice),
       sellPrice: Number(create.sellPrice),
       quantity: Number(create.quantity),
-      warehouseId: selectedWarehouseId || undefined,
+      warehouseId: selectedWarehouseId,
     });
   };
 
   const handleUpdate = () => {
-    const id = (edit as any).id;
+    if (!edit.id || !selectedWarehouseId) {
+      toast({
+        title: "خطأ",
+        description: "بيانات غير مكتملة",
+        variant: "destructive",
+      });
+      return;
+    }
     updateMut.mutate({
-      id,
+      id: edit.id,
       data: {
         name: edit.name.trim(),
         code: edit.code.trim(),
         buyPrice: Number(edit.buyPrice),
         sellPrice: Number(edit.sellPrice),
         quantity: Number(edit.quantity),
-        warehouseId: selectedWarehouseId || undefined,
+        warehouseId: selectedWarehouseId,
       },
     });
   };
@@ -309,7 +324,7 @@ export default function ProductsPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((product) => {
+                filtered.map((product: Product) => {
                   const stockBadge = getStockBadge(product.quantity);
                   return (
                     <tr key={product.id} className="border-t border-slate-700/50">

@@ -14,6 +14,7 @@ import {
   User,
   Menu,
   X,
+  CreditCard,
 } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { Button } from "@/components/ui/button";
@@ -43,19 +44,20 @@ type NavItem = {
   href: string;
   label: string;
   icon: typeof Package;
-  roles?: ("admin" | "user" | "auditor")[];
+  permissions?: string[];
 };
 
 const NAV: NavItem[] = [
-  { href: "/", label: "لوحة التحكم", icon: LayoutDashboard },
-  { href: "/products", label: "المنتجات", icon: Package },
-  { href: "/stock-movements", label: "حركة المخزون", icon: ArrowUpDown },
-  { href: "/invoices", label: "الفواتير", icon: FileText },
-  { href: "/reports", label: "التقارير", icon: BarChart3 },
-  { href: "/warehouses", label: "المخازن", icon: WarehouseIcon, roles: ["admin"] },
-  { href: "/users", label: "المستخدمين", icon: Users, roles: ["admin"] },
-  { href: "/settings", label: "الإعدادات", icon: SettingsIcon, roles: ["admin"] },
-  { href: "/logs", label: "سجل العمليات", icon: ScrollText },
+  { href: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, permissions: ["view-dashboard"] },
+  { href: "/products", label: "المنتجات", icon: Package, permissions: ["view-products"] },
+  { href: "/stock-movements", label: "حركة المخزون", icon: ArrowUpDown, permissions: ["view-movements"] },
+  { href: "/invoices", label: "الفواتير", icon: FileText, permissions: ["view-invoices"] },
+  { href: "/reports", label: "التقارير", icon: BarChart3, permissions: ["view-reports"] },
+  { href: "/warehouses", label: "المخازن", icon: WarehouseIcon, permissions: ["manage-warehouses"] },
+  { href: "/users", label: "المستخدمين", icon: Users, permissions: ["view-users"] },
+  { href: "/subscriptions", label: "الاشتراكات", icon: CreditCard, permissions: ["view-subscriptions"] },
+  { href: "/settings", label: "الإعدادات", icon: SettingsIcon, permissions: ["manage-settings"] },
+  { href: "/logs", label: "سجل العمليات", icon: ScrollText, permissions: ["view-logs"] },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -80,7 +82,20 @@ export function Layout({ children }: { children: ReactNode }) {
 
   if (!user) return <>{children}</>;
 
-  const visibleNav = NAV.filter((n) => !n.roles || n.roles.includes(user.role));
+  const visibleNav = NAV.filter((n) => {
+  // If no permissions specified, show to everyone
+  if (!n.permissions || n.permissions.length === 0) {
+    return true;
+  }
+  
+  // If user has no permissions, hide restricted items
+  if (!user?.permissions || user.permissions.length === 0) {
+    return false;
+  }
+  
+  // Check if user has ANY of the required permissions
+  return n.permissions.some(permission => user.permissions.includes(permission));
+});
   const lockedWarehouse = user.role === "user" && !!user.assignedWarehouseId;
   const currentName = settings.companyName || "شركة سنك";
 
@@ -134,18 +149,19 @@ export function Layout({ children }: { children: ReactNode }) {
               location === n.href ||
               (n.href !== "/" && location.startsWith(n.href));
             return (
-              <Link key={n.href} href={n.href} onClick={() => isMobile && setSidebarOpen(false)}>
-                <a
-                  className={`flex items-center gap-3 rounded-lg px-4 py-3 text-[15px] font-medium transition-all duration-200 ${
-                    active
-                      ? "bg-[#1e3a8a] text-white shadow-lg shadow-blue-900/30 border-r-2 border-blue-400"
-                      : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
-                  }`}
-                  data-testid={`link-nav-${n.href.replace(/\//g, "-")}`}
-                >
-                  <Icon className="size-5 shrink-0" />
-                  <span className="truncate">{n.label}</span>
-                </a>
+              <Link 
+                key={n.href} 
+                href={n.href} 
+                onClick={() => isMobile && setSidebarOpen(false)}
+                className={`flex items-center gap-3 rounded-lg px-4 py-3 text-[15px] font-medium transition-all duration-200 ${
+                  active
+                    ? "bg-[#1e3a8a] text-white shadow-lg shadow-blue-900/30 border-r-2 border-blue-400"
+                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                }`}
+                data-testid={`link-nav-${n.href.replace(/\//g, "-")}`}
+              >
+                <Icon className="size-5 shrink-0" />
+                <span className="truncate">{n.label}</span>
               </Link>
             );
           })}
