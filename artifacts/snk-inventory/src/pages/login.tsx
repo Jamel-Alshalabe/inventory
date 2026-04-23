@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useApp } from "@/lib/app-context";
+import { authService } from "@/lib/auth-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +19,10 @@ export default function LoginPage() {
     setErr(null);
     setLoading(true);
     try {
+      await authService.login({ username: username.trim(), password });
+      // Use the app context login method to refresh user data
       await login(username.trim(), password);
+      window.location.href = '/dashboard';
     } catch (e) {
       setErr(e instanceof Error ? e.message : "فشل تسجيل الدخول");
     } finally {
@@ -45,6 +49,7 @@ export default function LoginPage() {
               required
               autoFocus
               data-testid="input-username"
+              autoComplete="username"
               className="bg-[#0e0c20] text-white "
             />
           </div>
@@ -56,12 +61,13 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               data-testid="input-password"
+              autoComplete="current-password"
               className="bg-[#0e0c20] text-white "
             />
           </div>
           {err && (
             <div
-              className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md"
+              className="text-sm text-red-400 bg-red-900/20 px-3 py-2 rounded-md border border-red-500/30"
               data-testid="text-login-error"
             >
               {err}

@@ -70,8 +70,8 @@ class ApiClient {
       // Handle 401 Unauthorized - token expired
       if (response.status === 401) {
         this.removeTokenFromStorage();
-        window.location.href = '/login';
-        throw new Error('Session expired. Please login again.');
+        // Don't redirect automatically - let the context handle it
+        throw new Error('Session expired');
       }
 
       const responseData = await response.json();
@@ -90,9 +90,37 @@ class ApiClient {
     }
   }
 
+  // Get CSRF cookie for Sanctum and return XSRF token
+  private async getCsrfCookie(): Promise<string | null> {
+    const baseUrl = this.baseURL.replace('/api', '');
+    await fetch(`${baseUrl}/sanctum/csrf-cookie`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    
+    // Read XSRF-TOKEN cookie
+    const cookies = document.cookie.split(';');
+    const xsrfCookie = cookies.find(c => c.trim().startsWith('XSRF-TOKEN='));
+    if (xsrfCookie) {
+      const token = xsrfCookie.split('=')[1];
+      // URL decode the base64 token
+      return decodeURIComponent(token);
+    }
+    return null;
+  }
+
   // Authentication Methods
   async login(credentials: { username: string; password: string }): Promise<{ token: string; user: AuthUser }> {
-    const response = await this.request<{ token: string; user: AuthUser }>('POST', '/auth/login', credentials);
+    // First, get CSRF cookie for Sanctum
+    const xsrfToken = await this.getCsrfCookie();
+    
+    // Add X-XSRF-TOKEN header for stateful authentication
+    const headers: Record<string, string> = {};
+    if (xsrfToken) {
+      headers['X-XSRF-TOKEN'] = xsrfToken;
+    }
+    
+    const response = await this.request<{ token: string; user: AuthUser }>('POST', '/auth/login', credentials, { headers });
     this.saveTokenToStorage(response.token);
     return response;
   }

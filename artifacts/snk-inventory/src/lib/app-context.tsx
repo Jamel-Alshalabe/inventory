@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, type AuthUser, type Warehouse } from "./api";
+import { apiClient, type AuthUser, type Warehouse } from "./api-client";
 
 type AppContextValue = {
   user: AuthUser | null;
@@ -39,13 +39,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const r = await api.get<{ user: AuthUser | null }>("/auth/me");
-    setUser(r.user);
+    try {
+      const user = await apiClient.getCurrentUser();
+      setUser(user);
+    } catch (error) {
+      // User is not authenticated - this is normal on initial load
+      setUser(null);
+    }
   }, []);
 
   const refreshWarehouses = useCallback(async () => {
     try {
-      const ws = await api.get<Warehouse[]>("/warehouses");
+      const ws = await apiClient.getWarehouses();
       setWarehouses(ws);
     } catch {
       setWarehouses([]);
@@ -54,7 +59,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshSettings = useCallback(async () => {
     try {
-      const s = await api.get<Record<string, string>>("/settings");
+      const s = await apiClient.getSettings();
       setSettings(s);
     } catch {
       setSettings({});
@@ -63,29 +68,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (username: string, password: string) => {
-      const r = await api.post<{ user: AuthUser }>("/auth/login", { username, password });
-      setUser(r.user);
+      const response = await apiClient.login({ username, password });
+      setUser(response.user);
       await Promise.all([refreshWarehouses(), refreshSettings()]);
     },
     [refreshWarehouses, refreshSettings],
   );
 
   const logout = useCallback(async () => {
-    await api.post("/auth/logout");
+    await apiClient.logout();
     setUser(null);
     setWarehouses([]);
     setSelectedWarehouseId(null);
   }, [setSelectedWarehouseId]);
 
+  // Initial auth check - only run once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    let isMounted = true;
+    
     (async () => {
       try {
-        await refreshUser();
+        if (isMounted) {
+          await refreshUser();
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     })();
-  }, [refreshUser]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -147,5 +164,5 @@ export function useApp(): AppContextValue {
 }
 
 export function warehouseQuery(id: number | null): string {
-  return id ? `?warehouseId=${id}` : "";
+  return id ? `?warehouse_id=${id}` : "";
 }

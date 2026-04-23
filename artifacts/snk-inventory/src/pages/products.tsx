@@ -1,8 +1,8 @@
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { useApp, warehouseQuery } from "@/lib/app-context";
-import { api, fmtMoney, type Product } from "@/lib/api";
+import { apiClient, fmtMoney, type Product } from "@/lib/api-client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,11 +16,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { DataTable } from "@/components/ui/data-table";
 import { useConfirmation } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, FileSpreadsheet, Download, Search } from "lucide-react";
-import { ColumnDef } from "@tanstack/react-table";
 
 type FormState = {
   name: string;
@@ -32,384 +30,403 @@ type FormState = {
 
 const empty: FormState = { name: "", code: "", buyPrice: "0", sellPrice: "0", quantity: "0" };
 
-function getColumns(
-  user: any,
-  openEdit: (product: Product) => void,
-  deleteMut: any,
-  confirm: (options: { title: string; description: string; onConfirm: () => void }) => void
-): ColumnDef<Product>[] {
-  return [
-    {
-      accessorKey: "code",
-      header: "الكود",
-      cell: ({ row }) => (
-        <div className="font-mono text-xs">{row.getValue("code")}</div>
-      ),
-    },
-    {
-      accessorKey: "name",
-      header: "الاسم",
-      cell: ({ row }) => (
-        <div className="font-semibold">{row.getValue("name")}</div>
-      ),
-    },
-    {
-      accessorKey: "buyPrice",
-      header: "سعر الشراء",
-      cell: ({ row }) => {
-        const amount = parseFloat(row.getValue("buyPrice"));
-        return <div>{fmtMoney(amount, "ج.م")}</div>;
-      },
-    },
-    {
-      accessorKey: "sellPrice",
-      header: "سعر البيع",
-      cell: ({ row }) => {
-        const amount = parseFloat(row.getValue("sellPrice"));
-        return <div>{fmtMoney(amount, "ج.م")}</div>;
-      },
-    },
-    {
-      accessorKey: "quantity",
-      header: "الكمية",
-      cell: ({ row }) => {
-        const quantity = row.getValue("quantity") as number;
-        return (
-          <Badge
-            variant="outline"
-            className={
-              quantity === 0
-                ? "border-destructive text-destructive"
-                : quantity <= 5
-                ? "border-chart-3 text-chart-3"
-                : ""
-            }
-          >
-            {quantity}
-          </Badge>
-        );
-      },
-    },
-    {
-      accessorKey: "warehouseName",
-      header: "المخزن",
-      cell: ({ row }) => (
-        <div className="text-muted-foreground text-sm">{row.getValue("warehouseName")}</div>
-      ),
-    },
-    {
-      id: "actions",
-      header: "إجراءات",
-      cell: ({ row }) => {
-        const product = row.original;
-        const canEdit = user?.role === "admin" || user?.role === "user";
-        
-        if (!canEdit) return null;
-        
-        return (
-          <div className="flex items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => openEdit(product)}
-              data-testid={`button-edit-${product.id}`}
-            >
-              <Pencil className="size-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => {
-                confirm({
-                  title: "حذف المنتج",
-                  description: `هل أنت متأكد من حذف المنتج "${product.name}"؟ هذا الإجراء لا يمكن التراجع عنه.`,
-                  onConfirm: () => deleteMut.mutate(product.id),
-                });
-              }}
-              data-testid={`button-delete-${product.id}`}
-            >
-              <Trash2 className="size-4 text-destructive" />
-            </Button>
-          </div>
-        );
-      },
-    },
-  ];
-}
-
 export default function ProductsPage() {
-  const { selectedWarehouseId, user, settings } = useApp();
-  const currency = settings.currency || "ج.م";
-  const { toast } = useToast();
+  const { user, selectedWarehouseId } = useApp();
+  const [search, setSearch] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [edit, setEdit] = useState<FormState>(empty);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [create, setCreate] = useState<FormState>(empty);
   const qc = useQueryClient();
-  const { confirm, ConfirmationComponent } = useConfirmation();
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<FormState>(empty);
+  const { toast } = useToast();
 
-  const canEdit = user?.role === "admin" || user?.role === "user";
-
-  const { data: products = [] } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["products", selectedWarehouseId],
-    queryFn: () => {
-      const qs = new URLSearchParams();
-      if (selectedWarehouseId) qs.set("warehouseId", String(selectedWarehouseId));
-      return api.get<Product[]>(`/products?${qs.toString()}`);
-    },
+    queryFn: () => apiClient.getProducts(selectedWarehouseId || undefined),
+    retry: 2,
+    staleTime: 30000,
   });
 
   const createMut = useMutation({
-    mutationFn: (body: Record<string, unknown>) => api.post<Product>("/products", body),
+    mutationFn: (data: Omit<Product, "id" | "createdAt" | "warehouseName">) => apiClient.createProduct(data),
     onSuccess: () => {
-      toast({ title: "تم إضافة المنتج" });
       qc.invalidateQueries({ queryKey: ["products"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
-      setOpen(false);
-      setForm(empty);
+      setCreateOpen(false);
+      setCreate(empty);
+      toast({
+        title: "نجاح",
+        description: "تم إضافة المنتج بنجاح",
+      });
     },
-    onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
+    onError: (error: any) => {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل إضافة المنتج",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: Record<string, unknown> }) =>
-      api.put<Product>(`/products/${id}`, body),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Product> }) => apiClient.updateProduct(id, data),
     onSuccess: () => {
-      toast({ title: "تم التعديل" });
       qc.invalidateQueries({ queryKey: ["products"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
-      setOpen(false);
-      setEditing(null);
-      setForm(empty);
+      setEditOpen(false);
+      setEdit(empty);
+      toast({
+        title: "نجاح",
+        description: "تم تحديث المنتج بنجاح",
+      });
     },
-    onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
+    onError: (error: any) => {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل تحديث المنتج",
+        variant: "destructive",
+      });
+    },
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => api.del(`/products/${id}`),
+    mutationFn: apiClient.deleteProduct,
     onSuccess: () => {
-      toast({ title: "تم الحذف" });
       qc.invalidateQueries({ queryKey: ["products"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast({
+        title: "نجاح",
+        description: "تم حذف المنتج بنجاح",
+      });
     },
-    onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
+    onError: (error: any) => {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل حذف المنتج",
+        variant: "destructive",
+      });
+    },
   });
 
-  const importMut = useMutation({
-    mutationFn: (rows: unknown[]) =>
-      api.post<{ created: number; skipped: number }>("/products/bulk", {
-        products: rows,
-        warehouseId: selectedWarehouseId,
-      }),
-    onSuccess: (r) => {
-      toast({ title: "اكتمل الاستيراد", description: `أُضيف ${r.created}، تم تخطي ${r.skipped}` });
-      qc.invalidateQueries({ queryKey: ["products"] });
-    },
-    onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
-  });
+  const confirm = useConfirmation();
 
-  const summary = useMemo(() => {
-    const totalQty = products.reduce((s, p) => s + p.quantity, 0);
-    const value = products.reduce((s, p) => s + p.quantity * p.sellPrice, 0);
-    return { totalQty, value };
-  }, [products]);
+  const filtered = useMemo(() => {
+    if (!data) return [];
+    const s = search.trim().toLowerCase();
+    return data.filter(
+      (p) =>
+        p.name.toLowerCase().includes(s) ||
+        p.code.toLowerCase().includes(s)
+    );
+  }, [data, search]);
 
-  function openAdd() {
-    setEditing(null);
-    setForm(empty);
-    setOpen(true);
-  }
-
-  function openEdit(p: Product) {
-    setEditing(p);
-    setForm({
-      name: p.name,
-      code: p.code,
-      buyPrice: String(p.buyPrice),
-      sellPrice: String(p.sellPrice),
-      quantity: String(p.quantity),
+  const handleCreate = () => {
+    createMut.mutate({
+      name: create.name.trim(),
+      code: create.code.trim(),
+      buyPrice: Number(create.buyPrice),
+      sellPrice: Number(create.sellPrice),
+      quantity: Number(create.quantity),
+      warehouseId: selectedWarehouseId || undefined,
     });
-    setOpen(true);
-  }
+  };
 
-  function handleSubmit() {
-    if (!form.name.trim() || !form.code.trim()) {
-      toast({ title: "الاسم والكود مطلوبان", variant: "destructive" });
-      return;
-    }
-    const body = {
-      name: form.name.trim(),
-      code: form.code.trim(),
-      buyPrice: Number(form.buyPrice),
-      sellPrice: Number(form.sellPrice),
-      quantity: Number(form.quantity),
-      warehouseId: selectedWarehouseId,
-    };
-    if (editing) updateMut.mutate({ id: editing.id, body });
-    else createMut.mutate(body);
-  }
+  const handleUpdate = () => {
+    const id = (edit as any).id;
+    updateMut.mutate({
+      id,
+      data: {
+        name: edit.name.trim(),
+        code: edit.code.trim(),
+        buyPrice: Number(edit.buyPrice),
+        sellPrice: Number(edit.sellPrice),
+        quantity: Number(edit.quantity),
+        warehouseId: selectedWarehouseId || undefined,
+      },
+    });
+  };
 
-  function handleImport(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const ab = ev.target?.result;
-      if (!ab) return;
-      const wb = XLSX.read(ab, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
-      const rows = json
-        .map((r) => ({
-          name: String(r["الاسم"] ?? r["name"] ?? "").trim(),
-          code: String(r["الكود"] ?? r["code"] ?? "").trim(),
-          buyPrice: Number(r["سعر الشراء"] ?? r["buyPrice"] ?? 0),
-          sellPrice: Number(r["سعر البيع"] ?? r["sellPrice"] ?? 0),
-          quantity: Number(r["الكمية"] ?? r["quantity"] ?? 0),
-        }))
-        .filter((r) => r.name && r.code);
-      if (rows.length === 0) {
-        toast({ title: "الملف فارغ أو غير صالح", variant: "destructive" });
-        return;
-      }
-      importMut.mutate(rows);
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = "";
-  }
-
-  function handleExport() {
-    const data = products.map((p) => ({
-      الاسم: p.name,
-      الكود: p.code,
-      "سعر الشراء": p.buyPrice,
-      "سعر البيع": p.sellPrice,
-      الكمية: p.quantity,
-      المخزن: p.warehouseName ?? "",
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
+  const exportExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(filtered);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "المنتجات");
-    XLSX.writeFile(wb, `products-${Date.now()}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Products");
+    XLSX.writeFile(wb, "products.xlsx");
+  };
+
+  const openEdit = (product: Product) => {
+    setEdit({
+      id: product.id,
+      name: product.name,
+      code: product.code,
+      buyPrice: product.buyPrice.toString(),
+      sellPrice: product.sellPrice.toString(),
+      quantity: product.quantity.toString(),
+    });
+    setEditOpen(true);
+  };
+
+  const handleDelete = (productId: number, productName: string) => {
+    confirm({
+      title: "حذف المنتج",
+      description: `هل أنت متأكد من حذف "${productName}"؟`,
+      onConfirm: () => deleteMut.mutate(productId),
+    });
+  };
+
+  const getStockBadge = (quantity: number) => {
+    if (quantity <= 10) return { variant: "destructive" as const, text: "منخفض جداً" };
+    if (quantity <= 50) return { variant: "secondary" as const, text: "منخفض" };
+    return { variant: "default" as const, text: "متوفر" };
+  };
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen" style={{background: "linear-gradient(135deg, #08081a 0%, #0d0d1a 50%, #121230 100%)"}}>
+        <div className="text-white">جاري تحميل...</div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">المنتجات</h1>
-          
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {canEdit && (
-            <>
-              <label>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  className="hidden"
-                  onChange={handleImport}
-                  data-testid="input-import"
-                />
-                <Button variant="outline" asChild>
-                  <span className="cursor-pointer">
-                    <FileSpreadsheet className="size-4 ml-2" />
-                    استيراد إكسل
-                  </span>
-                </Button>
-              </label>
-            </>
-          )}
-          <Button variant="outline" onClick={handleExport} data-testid="button-export">
-            <Download className="size-4 ml-2" />
-            تصدير
-          </Button>
-          {canEdit && (
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={openAdd} data-testid="button-add-product">
-                  <Plus className="size-4 ml-2" />
-                  إضافة منتج
-                </Button>
-              </DialogTrigger>
-              <DialogContent dir="rtl">
-                <DialogHeader>
-                  <DialogTitle>{editing ? "تعديل منتج" : "إضافة منتج"}</DialogTitle>
-                </DialogHeader>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2 col-span-2">
-                    <Label>اسم المنتج</Label>
-                    <Input
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      data-testid="input-name"
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label>كود الصنف</Label>
-                    <Input
-                      value={form.code}
-                      onChange={(e) => setForm({ ...form, code: e.target.value })}
-                      data-testid="input-code"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>سعر الشراء</Label>
-                    <Input
-                      type="number"
-                      value={form.buyPrice}
-                      onChange={(e) => setForm({ ...form, buyPrice: e.target.value })}
-                      data-testid="input-buy"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>سعر البيع</Label>
-                    <Input
-                      type="number"
-                      value={form.sellPrice}
-                      onChange={(e) => setForm({ ...form, sellPrice: e.target.value })}
-                      data-testid="input-sell"
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label>الكمية </Label>
-                    <Input
-                      type="number"
-                      value={form.quantity}
-                      onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                      disabled={!!editing}
-                      data-testid="input-qty"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setOpen(false)}>
-                    إلغاء
+    <div className="p-6 space-y-6" style={{background: "linear-gradient(135deg, #08081a 0%, #0d0d1a 50%, #121230 100%)"}}>
+      <Card className="p-6 bg-[#16162b] border border-slate-700/50 backdrop-blur-xl">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-white">المنتجات</h1>
+          <div className="flex items-center gap-2">
+            {(user.role === "admin" || user.role === "user") && (
+              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="size-4 ml-2" />
+                    إضافة منتج
                   </Button>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={createMut.isPending || updateMut.isPending}
-                    data-testid="button-save"
-                  >
-                    حفظ
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+                </DialogTrigger>
+                <DialogContent className="bg-[#16162b] border border-slate-700/50">
+                  <DialogHeader>
+                    <DialogTitle className="text-white">إضافة منتج جديد</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-slate-400">اسم المنتج</Label>
+                      <Input
+                        value={create.name}
+                        onChange={(e) => setCreate({ ...create, name: e.target.value })}
+                        className="bg-[#0e0c20] text-white"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-slate-400">الكود</Label>
+                      <Input
+                        value={create.code}
+                        onChange={(e) => setCreate({ ...create, code: e.target.value })}
+                        className="bg-[#0e0c20] text-white"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-slate-400">سعر الشراء</Label>
+                        <Input
+                          type="number"
+                          value={create.buyPrice}
+                          onChange={(e) => setCreate({ ...create, buyPrice: e.target.value })}
+                          className="bg-[#0e0c20] text-white"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-slate-400">سعر البيع</Label>
+                        <Input
+                          type="number"
+                          value={create.sellPrice}
+                          onChange={(e) => setCreate({ ...create, sellPrice: e.target.value })}
+                          className="bg-[#0e0c20] text-white"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-slate-400">الكمية</Label>
+                      <Input
+                        type="number"
+                        value={create.quantity}
+                        onChange={(e) => setCreate({ ...create, quantity: e.target.value })}
+                        className="bg-[#0e0c20] text-white"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCreateOpen(false)}
+                      className="border-slate-600 text-slate-400"
+                    >
+                      إلغاء
+                    </Button>
+                    <Button onClick={handleCreate} disabled={createMut.isPending}>
+                      {createMut.isPending && <div className="size-4 animate-spin ml-2" />}
+                      إضافة
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+            <Button variant="outline" onClick={exportExcel} className="border-slate-600 text-slate-400">
+              <Download className="size-4 ml-2" />
+              تصدير Excel
+            </Button>
+          </div>
         </div>
-      </div>
-
-      <Card className="p-5">
-        <DataTable
-          columns={getColumns(user, openEdit, deleteMut, confirm)}
-          data={products}
-          searchKey="name"
-          searchPlaceholder="بحث بالاسم أو الكود..."
-          emptyMessage="لا توجد منتجات"
-        />
+        <div className="flex items-center gap-2 max-w-md">
+          <Search className="size-4 text-slate-400" />
+          <Input
+            placeholder="بحث بالاسم أو الكود..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-[#0e0c20] text-white placeholder:text-slate-500"
+          />
+        </div>
+        
+        {/* Products Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[#1a1a2e] text-slate-300">
+                <th className="px-4 py-3 text-right font-medium">الكود</th>
+                <th className="px-4 py-3 text-right font-medium">الاسم</th>
+                <th className="px-4 py-3 text-right font-medium">الكمية</th>
+                <th className="px-4 py-3 text-right font-medium">سعر الشراء</th>
+                <th className="px-4 py-3 text-right font-medium">سعر البيع</th>
+                <th className="px-4 py-3 text-right font-medium">المخزن</th>
+                <th className="px-4 py-3 text-right font-medium">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-slate-400">
+                    جاري التحميل...
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-slate-400">
+                    لا توجد منتجات
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((product) => {
+                  const stockBadge = getStockBadge(product.quantity);
+                  return (
+                    <tr key={product.id} className="border-t border-slate-700/50">
+                      <td className="px-4 py-3 font-mono text-xs">{product.code}</td>
+                      <td className="px-4 py-3 font-medium text-white truncate max-w-[200px]" title={product.name}>
+                        {product.name}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={stockBadge.variant}>
+                          {product.quantity} - {stockBadge.text}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{fmtMoney(product.buyPrice)}</td>
+                      <td className="px-4 py-3 text-sm font-medium">{fmtMoney(product.sellPrice)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-400">
+                        {product.warehouseName || "-"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {(user.role === "admin" || user.role === "user") && (
+                            <>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => openEdit(product)}
+                              >
+                                <Pencil className="size-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-red-400 hover:text-red-300"
+                                onClick={() => handleDelete(product.id, product.name)}
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </Card>
-      
-      <ConfirmationComponent isLoading={deleteMut.isPending} />
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="bg-[#16162b] border border-slate-700/50">
+          <DialogHeader>
+            <DialogTitle className="text-white">تعديل المنتج</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-slate-400">اسم المنتج</Label>
+              <Input
+                value={edit.name}
+                onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                className="bg-[#0e0c20] text-white"
+              />
+            </div>
+            <div>
+              <Label className="text-slate-400">الكود</Label>
+              <Input
+                value={edit.code}
+                onChange={(e) => setEdit({ ...edit, code: e.target.value })}
+                className="bg-[#0e0c20] text-white"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-slate-400">سعر الشراء</Label>
+                <Input
+                  type="number"
+                  value={edit.buyPrice}
+                  onChange={(e) => setEdit({ ...edit, buyPrice: e.target.value })}
+                  className="bg-[#0e0c20] text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-400">سعر البيع</Label>
+                <Input
+                  type="number"
+                  value={edit.sellPrice}
+                  onChange={(e) => setEdit({ ...edit, sellPrice: e.target.value })}
+                  className="bg-[#0e0c20] text-white"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-slate-400">الكمية</Label>
+              <Input
+                type="number"
+                value={edit.quantity}
+                onChange={(e) => setEdit({ ...edit, quantity: e.target.value })}
+                className="bg-[#0e0c20] text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              className="border-slate-600 text-slate-400"
+            >
+              إلغاء
+            </Button>
+            <Button onClick={handleUpdate} disabled={updateMut.isPending}>
+              {updateMut.isPending && <div className="size-4 animate-spin ml-2" />}
+              حفظ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
