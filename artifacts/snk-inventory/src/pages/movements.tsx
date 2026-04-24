@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp, warehouseQuery } from "@/lib/app-context";
 import { api, fmtDate, fmtMoney, type Movement, type Product } from "@/lib/api";
+import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,26 +140,34 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
       const qs = new URLSearchParams();
       if (selectedWarehouseId) qs.set("warehouseId", String(selectedWarehouseId));
       qs.set("type", type);
-      return api.get<Movement[]>(`/movements?${qs.toString()}`);
+      return customFetch<Movement[]>(`/api/movements?${qs.toString()}`);
     },
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", selectedWarehouseId, ""],
-    queryFn: () => api.get<Product[]>(`/products${warehouseQuery(selectedWarehouseId)}`),
+    queryFn: () => customFetch<Product[]>(`/api/products${warehouseQuery(selectedWarehouseId)}`),
   });
 
   const createMut = useMutation({
     mutationFn: () =>
-      api.post<Movement>("/movements", {
-        type,
-        productCode,
-        quantity: Number(quantity),
-        price: Number(price),
-        warehouseId: selectedWarehouseId,
+      customFetch<Movement>("/api/movements", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          productCode,
+          quantity: Number(quantity),
+          price: Number(price),
+          warehouseId: selectedWarehouseId,
+        }),
       }),
     onSuccess: () => {
-      toast({ title: type === "in" ? "تم تسجيل الوارد" : "تم تسجيل الصادر" });
+      toast({ 
+        title: type === "in" ? "تم تسجيل الوارد" : "تم تسجيل الصادر",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
+      });
       qc.invalidateQueries({ queryKey: ["movements"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -171,9 +180,15 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => api.del(`/movements/${id}`),
+    mutationFn: (id: number) => customFetch(`/api/movements/${id}`, {
+      method: 'DELETE',
+    }),
     onSuccess: () => {
-      toast({ title: "تم الحذف" });
+      toast({ 
+        title: "تم الحذف",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
+      });
       qc.invalidateQueries({ queryKey: ["movements"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -181,12 +196,12 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
     onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
   });
 
-  const totalQty = movements.reduce((s, m) => s + m.quantity, 0);
-  const totalValue = movements.reduce((s, m) => s + m.total, 0);
+  const totalQty = movements.reduce((s: number, m: Movement) => s + m.quantity, 0);
+  const totalValue = movements.reduce((s: number, m: Movement) => s + m.total, 0);
 
   function onPickProduct(code: string) {
     setProductCode(code);
-    const p = products.find((x) => x.code === code);
+    const p = products.find((x: Product) => x.code === code);
     if (p) setPrice(String(type === "in" ? p.buyPrice : p.sellPrice));
   }
 
@@ -219,7 +234,7 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
                       <SelectValue placeholder="اختر المنتج" />
                     </SelectTrigger>
                     <SelectContent>
-                      {products.map((p) => (
+                      {products.map((p: Product) => (
                         <SelectItem key={p.id} value={p.code}>
                           {p.name} ({p.code}) — متاح {p.quantity}
                         </SelectItem>

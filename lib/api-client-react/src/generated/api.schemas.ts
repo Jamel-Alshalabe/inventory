@@ -23,7 +23,7 @@ export type SysUserRole = (typeof SysUserRole)[keyof typeof SysUserRole];
 export const SysUserRole = {
   admin: "admin",
   user: "user",
-  auditor: "auditor",
+  editor: "editor",
 } as const;
 
 export interface SysUser {
@@ -32,6 +32,7 @@ export interface SysUser {
   role: SysUserRole;
   assignedWarehouseId?: number | null;
   assignedWarehouseName?: string | null;
+  max_warehouses?: number;
 }
 
 export interface AuthResponse {

@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
 import { useApp } from "@/lib/app-context";
-import { authService } from "@/lib/auth-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

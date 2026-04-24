@@ -15,7 +15,7 @@ export function fmtDate(iso: string): string {
 }
 
 // Export types for compatibility
-export type Role = "admin" | "super_admin" | "user" | "auditor";
+export type Role = "admin" | "super_admin" | "user" | "editor";
 
 export type AuthUser = {
   id: number;
@@ -24,6 +24,7 @@ export type AuthUser = {
   permissions: string[];
   assignedWarehouseId: number | null;
   assignedWarehouseName: string | null;
+  maxWarehouses: number;
   email?: string;
   avatar?: string;
 };
@@ -105,5 +106,28 @@ setBaseUrl(import.meta.env.VITE_API_BASE_URL);
 // Export all API functions as a single 'api' object
 import * as generatedApi from "../../../../lib/api-client-react/src/generated/api";
 
-export const api = generatedApi;
+// Import customFetch from the correct location
+import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
+
+// Add missing update user method using same pattern as createUser
+const updateUser = async (id: number, data: Partial<AuthUser>) => {
+  return customFetch<AuthUser>(`/api/users/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+};
+
+// Add missing delete user method using same pattern as createUser
+const deleteUser = async (id: number) => {
+  return customFetch<{ ok: true }>(`/api/users/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+export const api = {
+  ...generatedApi,
+  updateUser,
+  deleteUser,
+};
 

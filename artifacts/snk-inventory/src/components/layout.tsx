@@ -39,12 +39,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 
-type NavItem = {
+interface NavItem {
   href: string;
   label: string;
-  icon: typeof Package;
+  icon: LucideIcon;
   permissions?: string[];
+  role?: string;
 };
 
 const NAV: NavItem[] = [
@@ -55,7 +57,7 @@ const NAV: NavItem[] = [
   { href: "/reports", label: "التقارير", icon: BarChart3, permissions: ["view-reports"] },
   { href: "/warehouses", label: "المخازن", icon: WarehouseIcon, permissions: ["manage-warehouses"] },
   { href: "/users", label: "المستخدمين", icon: Users, permissions: ["view-users"] },
-  { href: "/subscriptions", label: "الاشتراكات", icon: CreditCard, permissions: ["view-subscriptions"] },
+  { href: "/subscriptions", label: "الاشتراكات", icon: CreditCard, role: "super_admin" },
   { href: "/settings", label: "الإعدادات", icon: SettingsIcon, permissions: ["manage-settings"] },
   { href: "/logs", label: "سجل العمليات", icon: ScrollText, permissions: ["view-logs"] },
 ];
@@ -83,19 +85,18 @@ export function Layout({ children }: { children: ReactNode }) {
   if (!user) return <>{children}</>;
 
   const visibleNav = NAV.filter((n) => {
-  // If no permissions specified, show to everyone
-  if (!n.permissions || n.permissions.length === 0) {
-    return true;
-  }
-  
-  // If user has no permissions, hide restricted items
-  if (!user?.permissions || user.permissions.length === 0) {
-    return false;
-  }
-  
-  // Check if user has ANY of the required permissions
-  return n.permissions.some(permission => user.permissions.includes(permission));
-});
+    // Check role-based access first
+    if (n.role && user.role !== n.role) {
+      return false;
+    }
+    // If no permissions specified, show to everyone
+    if (!n.permissions || n.permissions.length === 0) {
+      return true;
+    }
+    // Check if user has all required permissions
+    return n.permissions.every((p) => user.permissions.includes(p));
+  });
+
   const lockedWarehouse = user.role === "user" && !!user.assignedWarehouseId;
   const currentName = settings.companyName || "شركة سنك";
 
@@ -189,17 +190,17 @@ export function Layout({ children }: { children: ReactNode }) {
               <Select
                 value={selectedWarehouseId ? String(selectedWarehouseId) : ""}
                 onValueChange={(v) => setSelectedWarehouseId(v ? Number(v) : null)}
-                disabled={lockedWarehouse || warehouses.length === 0}
+                disabled={lockedWarehouse || !Array.isArray(warehouses) || warehouses.length === 0}
               >
                 <SelectTrigger className="w-32 md:w-48" data-testid="select-warehouse">
                   <SelectValue placeholder="اختر المخزن" />
                 </SelectTrigger>
                 <SelectContent>
-                  {warehouses.map((w) => (
+                  {Array.isArray(warehouses) ? warehouses.map((w) => (
                     <SelectItem key={w.id} value={String(w.id)}>
                       {w.name}
                     </SelectItem>
-                  ))}
+                  )) : null}
                 </SelectContent>
               </Select>
             </div>
@@ -209,17 +210,17 @@ export function Layout({ children }: { children: ReactNode }) {
               <Select
                 value={selectedWarehouseId ? String(selectedWarehouseId) : ""}
                 onValueChange={(v) => setSelectedWarehouseId(v ? Number(v) : null)}
-                disabled={lockedWarehouse || warehouses.length === 0}
+                disabled={lockedWarehouse || !Array.isArray(warehouses) || warehouses.length === 0}
               >
                 <SelectTrigger className="w-24" data-testid="select-warehouse-mobile">
                   <SelectValue placeholder="مخزن" />
                 </SelectTrigger>
                 <SelectContent>
-                  {warehouses.map((w) => (
+                  {Array.isArray(warehouses) ? warehouses.map((w) => (
                     <SelectItem key={w.id} value={String(w.id)}>
                       {w.name}
                     </SelectItem>
-                  ))}
+                  )) : null}
                 </SelectContent>
               </Select>
             </div>

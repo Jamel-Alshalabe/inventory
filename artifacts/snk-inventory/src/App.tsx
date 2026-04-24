@@ -79,11 +79,10 @@ function Routes() {
         )}
       </Route>
       <Route path="/subscriptions">
-        {() => (
-          <PermissionGuard permissions={["view-subscriptions"]}>
-            <SubscriptionsPage />
-          </PermissionGuard>
-        )}
+        {() => {
+          const { user } = useApp();
+          return user?.role === 'super_admin' ? <SubscriptionsPage /> : <NotFound />;
+        }}
       </Route>
       <Route path="/settings">
         {() => (

@@ -7,11 +7,11 @@ export interface LoginCredentials {
 }
 
 export interface AuthResponse {
-  token: string;
+  token?: string;
   user: {
     id: number;
     username: string;
-    role: 'admin' | 'user' | 'auditor';
+    role: 'admin' | 'user' | 'editor';
     assignedWarehouseId: number | null;
     assignedWarehouseName: string | null;
   };
@@ -20,6 +20,7 @@ export interface AuthResponse {
 export class AuthService {
   private static instance: AuthService;
   private token: string | null = null;
+  private static readonly TOKEN_KEYS = ["snk:token", "auth_token"] as const;
 
   private constructor() {
     this.loadToken();
@@ -33,26 +34,35 @@ export class AuthService {
   }
 
   private loadToken(): void {
-    this.token = localStorage.getItem('auth_token');
+    this.token =
+      localStorage.getItem(AuthService.TOKEN_KEYS[0]) ??
+      localStorage.getItem(AuthService.TOKEN_KEYS[1]);
   }
 
   private saveToken(token: string): void {
-    localStorage.setItem('auth_token', token);
+    for (const key of AuthService.TOKEN_KEYS) {
+      localStorage.setItem(key, token);
+    }
     this.token = token;
   }
 
   private removeToken(): void {
-    localStorage.removeItem('auth_token');
+    for (const key of AuthService.TOKEN_KEYS) {
+      localStorage.removeItem(key);
+    }
     this.token = null;
   }
 
   public async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
       const response = await api.login(credentials);
-      this.saveToken(response.token);
-      return response;
+      const token = (response as AuthResponse).token;
+      if (token) {
+        this.saveToken(token);
+      }
+      return response as AuthResponse;
     } catch (error) {
-      this.removeToken();
+      // Don't remove token on login failure, it might be valid
       throw error;
     }
   }
@@ -69,7 +79,10 @@ export class AuthService {
     try {
       return await api.getMe();
     } catch (error) {
-      this.removeToken();
+      // Only remove token on authentication errors (401)
+      if (error && typeof error === 'object' && 'status' in error && (error as any).status === 401) {
+        this.removeToken();
+      }
       throw error;
     }
   }
@@ -86,7 +99,10 @@ export class AuthService {
     try {
       await this.getCurrentUser();
     } catch (error) {
-      this.removeToken();
+      // Only remove token on authentication errors (401)
+      if (error && typeof error === 'object' && 'status' in error && (error as any).status === 401) {
+        this.removeToken();
+      }
       throw error;
     }
   }

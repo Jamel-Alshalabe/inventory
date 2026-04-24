@@ -58,6 +58,8 @@ export default function ProductsPage() {
       toast({
         title: "نجاح",
         description: "تم إضافة المنتج بنجاح",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
       });
     },
     onError: (error: any) => {
@@ -78,6 +80,8 @@ export default function ProductsPage() {
       toast({
         title: "نجاح",
         description: "تم تحديث المنتج بنجاح",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
       });
     },
     onError: (error: any) => {
@@ -96,6 +100,8 @@ export default function ProductsPage() {
       toast({
         title: "نجاح",
         description: "تم حذف المنتج بنجاح",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
       });
     },
     onError: (error: any) => {

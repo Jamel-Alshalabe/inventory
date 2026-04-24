@@ -23,7 +23,7 @@ export const LoginResponse = zod.object({
   user: zod.object({
     id: zod.number(),
     username: zod.string(),
-    role: zod.enum(["admin", "user", "auditor"]),
+    role: zod.enum(["admin", "user", "editor"]),
     assignedWarehouseId: zod.number().nullish(),
     assignedWarehouseName: zod.string().nullish(),
   }),

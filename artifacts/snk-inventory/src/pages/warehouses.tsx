@@ -28,13 +28,21 @@ export default function WarehousesPage() {
 
   const { data: warehouses = [] } = useQuery({
     queryKey: ["warehouses-page"],
-    queryFn: () => api.get<Warehouse[]>("/warehouses"),
+    queryFn: () => customFetch<Warehouse[]>("/api/warehouses"),
   });
 
   const createMut = useMutation({
-    mutationFn: () => api.post<Warehouse>("/warehouses", { name }),
+    mutationFn: () => customFetch<Warehouse>("/api/warehouses", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
     onSuccess: () => {
-      toast({ title: "تم إضافة المخزن" });
+      toast({ 
+        title: "تم إضافة المخزن",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
+      });
       qc.invalidateQueries({ queryKey: ["warehouses-page"] });
       void refreshWarehouses();
       setOpen(false);
@@ -44,9 +52,15 @@ export default function WarehousesPage() {
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => api.del(`/warehouses/${id}`),
+    mutationFn: (id: number) => customFetch(`/api/warehouses/${id}`, {
+      method: 'DELETE',
+    }),
     onSuccess: () => {
-      toast({ title: "تم الحذف" });
+      toast({ 
+        title: "تم الحذف",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
+      });
       qc.invalidateQueries({ queryKey: ["warehouses-page"] });
       void refreshWarehouses();
       setDeleteOpen(false);
@@ -93,7 +107,7 @@ export default function WarehousesPage() {
         </Dialog>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {warehouses.map((w) => (
+        {warehouses.map((w: Warehouse) => (
           <Card key={w.id} className="p-5" data-testid={`card-warehouse-${w.id}`}>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">

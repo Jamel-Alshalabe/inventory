@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Edit, Eye } from "lucide-react";
 
@@ -41,53 +42,89 @@ export default function UsersPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<AuthUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+
+  // Determine filtering info for display
+  const isSuperAdmin = me?.role === 'super_admin';
+  const filterInfo = isSuperAdmin 
+    ? "جميع المستخدمين" 
+    : "المستخدمين التابعين لك";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "user" | "editor">("user");
+  const [role, setRole] = useState<"admin" | "user" | "auditor">("user");
   const [warehouseId, setWarehouseId] = useState<string>("");
+  const [maxWarehouses, setMaxWarehouses] = useState<number>(1);
   
-  // Subscription fields
-  const [planType, setPlanType] = useState<"basic" | "premium" | "enterprise">("basic");
-  const [subscriptionStatus, setSubscriptionStatus] = useState<"active" | "expired" | "cancelled">("active");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
-  const [price, setPrice] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "bank_transfer" | "">("cash");
-  const [subscriptionNotes, setSubscriptionNotes] = useState<string>("");
-
-  const { data: users = [] } = useQuery({
+  
+  const { data: response = { data: [] }, isLoading, isFetching } = useQuery({
     queryKey: ["users"],
-    queryFn: () => api.get<AuthUser[]>("/users"),
+    queryFn: () => api.listUsers(),
   });
 
- 
+  // Extract users array from response
+  const users = Array.isArray(response) ? response : response?.data || [];
   const displayUsers = users.length > 0 ? users : [];
 
+  // Loading state
+  const isDataLoading = isLoading || (isFetching && users.length === 0);
+
+  // Debug: Log users data
+ 
+
   const createMut = useMutation({
-    mutationFn: () =>
-      api.post<AuthUser>("/users", {
+    mutationFn: async () => {
+      console.log('Frontend Debug - State values:', { username, password, role, warehouseId, maxWarehouses });
+      
+      const requestData = {
         username,
         password,
         role,
         assignedWarehouseId: warehouseId ? Number(warehouseId) : null,
-      }),
+        max_warehouses: maxWarehouses,
+      };
+      
+      console.log('Frontend Debug - Creating user with data:', requestData);
+      
+      try {
+        const response = await api.createUser(requestData);
+        
+        return response;
+      } catch (error) {
+        console.error('Frontend Debug - Error:', error);
+        throw error;
+      }
+    },
     onSuccess: () => {
-      toast({ title: "تم إضافة المستخدم" });
+      toast({ 
+        title: "تم إضافة المستخدم",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
+      });
       qc.invalidateQueries({ queryKey: ["users"] });
       setOpen(false);
       setUsername("");
       setPassword("");
       setRole("user");
       setWarehouseId("");
+      setMaxWarehouses(1);
     },
-    onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
+    onError: (error: any) => {
+      toast({ 
+        title: "فشل إضافة المستخدم", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => api.del(`/users/${id}`),
+    mutationFn: (id: number) => api.deleteUser(id),
     onSuccess: () => {
-      toast({ title: "تم الحذف" });
+      toast({ 
+        title: "تم الحذف",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
+      });
       qc.invalidateQueries({ queryKey: ["users"] });
       setDeleteOpen(false);
       setSelectedUser(null);
@@ -97,16 +134,20 @@ export default function UsersPage() {
 
   const updateMut = useMutation({
     mutationFn: (data: Partial<AuthUser>) =>
-      api.put<AuthUser>(`/users/${selectedUser?.id}`, data),
+      api.updateUser(selectedUser?.id || 0, data),
     onSuccess: () => {
-      toast({ title: "تم التحديث" });
+      toast({ 
+        title: "تم التحديث",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
+      });
       qc.invalidateQueries({ queryKey: ["users"] });
       setEditOpen(false);
       setSelectedUser(null);
       setUsername("");
       setPassword("");
       setRole("user");
-      setWarehouseId("");
+      setMaxWarehouses(1);
     },
     onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
   });
@@ -149,98 +190,28 @@ export default function UsersPage() {
               </div>
               <div className="space-y-2">
                 <Label>الدور</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as "admin" | "user" | "editor")}>
+                <Select value={role} onValueChange={(v) => setRole(v as any)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">مدير</SelectItem>
                     <SelectItem value="user">مستخدم</SelectItem>
-                    <SelectItem value="editor">مراجع حسابات</SelectItem>
+                    <SelectItem value="auditor">مراجع حسابات</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            
-            {/* Subscription Fields */}
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="text-lg font-semibold">معلومات الاشتراك</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>نوع الاشتراك</Label>
-                  <Select value={planType} onValueChange={(v) => setPlanType(v as typeof planType)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="basic">أساسي</SelectItem>
-                      <SelectItem value="premium">مميز</SelectItem>
-                      <SelectItem value="enterprise">مؤسسي</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>حالة الاشتراك</Label>
-                  <Select value={subscriptionStatus} onValueChange={(v) => setSubscriptionStatus(v as typeof subscriptionStatus)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">نشط</SelectItem>
-                      <SelectItem value="expired">منتهي</SelectItem>
-                      <SelectItem value="cancelled">ملغي</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>تاريخ البدء</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>تاريخ الانتهاء</Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>السعر</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>طريقة الدفع</Label>
-                  <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر طريقة الدفع" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">نقدي</SelectItem>
-                      <SelectItem value="card">بطاقة ائتمان</SelectItem>
-                      <SelectItem value="bank_transfer">تحويل بنكي</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
               <div className="space-y-2">
-                <Label>ملاحظات</Label>
+                <Label>أقصى عدد من المخازن</Label>
                 <Input
-                  placeholder="ملاحظات إضافية عن الاشتراك"
-                  value={subscriptionNotes}
-                  onChange={(e) => setSubscriptionNotes(e.target.value)}
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={maxWarehouses}
+                  onChange={(e) => setMaxWarehouses(Number(e.target.value))}
+                  data-testid="input-max-warehouses"
                 />
               </div>
-            </div>
-            
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>
@@ -260,18 +231,57 @@ export default function UsersPage() {
         </Dialog>
       </div>
       <Card className="p-5">
+        <div className="mb-4 flex justify-between items-center">
+          <h3 className="text-lg font-semibold">
+            {isDataLoading ? "جاري تحميل المستخدمين..." : "قائمة المستخدمين"}
+          </h3>
+          <div className="text-sm text-muted-foreground bg-muted px-3 py-1 rounded">
+            {isDataLoading ? (
+              "جاري التحميل..."
+            ) : (
+              `عرض: ${filterInfo} (${displayUsers.length} مستخدم)`
+            )}
+          </div>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-right">الرقم</TableHead>
+              <TableHead className="text-right">المعرف</TableHead>
               <TableHead className="text-right">اسم المستخدم</TableHead>
               <TableHead className="text-right">الدور</TableHead>
+              <TableHead className="text-right">أقصى عدد مخازن</TableHead>
               <TableHead className="text-right">الإجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {displayUsers.map((u) => (
-              <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
+            {isDataLoading ? (
+              // Loading skeleton
+              Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={`skeleton-${index}`}>
+                  <TableCell>
+                    <Skeleton className="h-4 w-8" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-32" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-8" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Skeleton className="h-8 w-8" />
+                      <Skeleton className="h-8 w-8" />
+                      <Skeleton className="h-8 w-8" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              displayUsers.map((u) => (
+                <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
                 <TableCell className="font-medium text-right">{u.id}</TableCell>
                 <TableCell className="font-semibold text-right">{u.username}</TableCell>
                 <TableCell>
@@ -284,9 +294,10 @@ export default function UsersPage() {
                         : "bg-muted"
                     }
                   >
-                    {u.role === "admin" ? "مدير" : u.role === "user" ? "مستخدم" : u.role === "editor" ? "مراجع حسابات" : "مراجع"}
+                    {u.role === "admin" ? "مدير" : u.role === "user" ? "مستخدم" : u.role === "auditor" ? "مراجع حسابات" : u.role}
                   </Badge>
                 </TableCell>
+                <TableCell className="text-right">{u.max_warehouses || 1}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex gap-1 ">
                     <Button
@@ -307,7 +318,9 @@ export default function UsersPage() {
                           onClick={() => {
                             setSelectedUser(u);
                             setUsername(u.username);
-                            setRole(u.role);
+                            setRole(u.role as "admin" | "user" | "auditor");
+                            setWarehouseId(u.assignedWarehouseId?.toString() || "");
+                            setMaxWarehouses(u.max_warehouses || 1);
                             setEditOpen(true);
                           }}
                         >
@@ -328,7 +341,7 @@ export default function UsersPage() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            )))}
           </TableBody>
         </Table>
       </Card>
@@ -367,101 +380,17 @@ export default function UsersPage() {
                 <SelectContent>
                   <SelectItem value="admin">مدير</SelectItem>
                   <SelectItem value="user">مستخدم</SelectItem>
-                  <SelectItem value="editor">مراجع حسابات</SelectItem>
+                  <SelectItem value="auditor">مراجع حسابات</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>المخزن</Label>
-              <Select value={warehouseId} onValueChange={(v) => setWarehouseId(v as typeof warehouseId)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {warehouses.map((warehouse) => (
-                    <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                      {warehouse.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="text-lg font-semibold">معلومات الاشتراك</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>نوع الاشتراك</Label>
-                <Select value={planType} onValueChange={(v) => setPlanType(v as typeof planType)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="basic">أساسي</SelectItem>
-                    <SelectItem value="premium">مميز</SelectItem>
-                    <SelectItem value="enterprise">مؤسسي</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>حالة الاشتراك</Label>
-                <Select value={subscriptionStatus} onValueChange={(v) => setSubscriptionStatus(v as typeof subscriptionStatus)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">نشط</SelectItem>
-                    <SelectItem value="expired">منتهي</SelectItem>
-                    <SelectItem value="cancelled">ملغي</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>تاريخ البدء</Label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>تاريخ الانتهاء</Label>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>السعر</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>طريقة الدفع</Label>
-                <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر طريقة الدفع" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">نقدي</SelectItem>
-                    <SelectItem value="card">بطاقة ائتمان</SelectItem>
-                    <SelectItem value="bank_transfer">تحويل بنكي</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>ملاحظات</Label>
+              <Label>أقصى عدد مخازن</Label>
               <Input
-                placeholder="ملاحظات إضافية عن الاشتراك"
-                value={subscriptionNotes}
-                onChange={(e) => setSubscriptionNotes(e.target.value)}
+                type="number"
+                min="1"
+                value={maxWarehouses}
+                onChange={(e) => setMaxWarehouses(Number(e.target.value))}
               />
             </div>
           </div>
@@ -473,18 +402,9 @@ export default function UsersPage() {
               onClick={() => updateMut.mutate({
                 username,
                 ...(password && { password }),
-                role,
-                assignedWarehouseId: warehouseId ? Number(warehouseId) : null,
-                // Subscription data
-                subscription: {
-                  plan_type: planType,
-                  status: subscriptionStatus,
-                  start_date: startDate,
-                  end_date: endDate,
-                  price: parseFloat(price) || 0,
-                  payment_method: paymentMethod || null,
-                  notes: subscriptionNotes || null,
-                }
+                role: role as any,
+                assignedWarehouseId: warehouseId ? parseInt(warehouseId) : null,
+                maxWarehouses: maxWarehouses,
               })}
               disabled={!username || updateMut.isPending}
               data-testid="button-update"
@@ -512,8 +432,13 @@ export default function UsersPage() {
                 <p className="font-semibold">
                   {(selectedUser?.role as any) === "admin" ? "مدير" : 
                    (selectedUser?.role as any) === "user" ? "مستخدم" : 
-                   (selectedUser?.role as any) === "editor" ? "مراجع حسابات" : "مراجع"}
+                   (selectedUser?.role as any) === "auditor" ? "مراجع حسابات" : selectedUser?.role}
                 </p>
+              </div>
+              
+              <div>
+                <Label className="text-sm text-muted-foreground">أقصى عدد مخازن</Label>
+                <p className="font-semibold">{selectedUser?.max_warehouses || 1}</p>
               </div>
               
               <div>
