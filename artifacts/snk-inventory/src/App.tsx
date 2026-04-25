@@ -33,7 +33,6 @@ function Routes() {
     permissions: string[]; 
     requireAny?: boolean; // true = any permission, false = all permissions
   }) {
-    console.log(permissions);
     if (!user?.permissions || user.permissions.length === 0) {
       return (
         <div className="text-center py-20 text-muted-foreground">

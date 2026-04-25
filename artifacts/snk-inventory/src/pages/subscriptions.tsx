@@ -364,14 +364,6 @@ export default function SubscriptionsPage() {
                         setSubscriptionCost(subscription.subscription_cost.toString());
                         setIsActive(subscription.is_active);
                         setNotes(subscription.notes || "");
-                        console.log('Edit subscription data:', {
-                          start_date: subscription.start_date,
-                          end_date: subscription.end_date,
-                          formattedStartDate,
-                          formattedEndDate,
-                          localStartDate: subscription.start_date ? new Date(subscription.start_date) : null,
-                          localEndDate: subscription.end_date ? new Date(subscription.end_date) : null
-                        });
                         setEditOpen(true);
                       }}
                     >

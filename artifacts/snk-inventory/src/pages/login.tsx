@@ -13,38 +13,26 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setErr(null);
+    setSuccess(null);
     setLoading(true);
     try {
       // Use only the app context login method
       await login(username.trim(), password);
       
-      // Get user data from localStorage after login
-      const storedUser = localStorage.getItem('snk:user');
-      const user = storedUser ? JSON.parse(storedUser) : null;
+      // بعد تسجيل الدخول الناجح، اعرض رسالة وانتظر المستخدم
+      setSuccess("تم تسجيل الدخول بنجاح! جاري التحويل إلى لوحة التحكم...");
       
-      const pageOrder = [
-        { href: '/dashboard', permission: 'view-dashboard' },
-        { href: '/products', permission: 'view-products' },
-        { href: '/stock-movements', permission: 'view-movements' },
-        { href: '/invoices', permission: 'view-invoices' },
-        { href: '/reports', permission: 'view-reports' },
-        { href: '/warehouses', permission: 'manage-warehouses' },
-        { href: '/users', permission: 'view-users' },
-        { href: '/settings', permission: 'manage-settings' },
-        { href: '/logs', permission: 'view-logs' },
-      ];
+      // انتظر ثانية واحدة ثم وجه إلى لوحة التحكم
+      setTimeout(() => {
+        setLocation('/dashboard');
+      }, 1500);
       
-      // Find first page user has permission for, or default to users page for superadmin
-      const firstAccessiblePage = pageOrder.find(page => 
-        user?.permissions?.includes(page.permission)
-      ) || { href: '/users', permission: 'view-users' };
-      
-      setLocation(firstAccessiblePage.href);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "فشل تسجيل الدخول");
     } finally {

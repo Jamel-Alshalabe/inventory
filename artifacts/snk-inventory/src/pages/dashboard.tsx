@@ -18,12 +18,14 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from "chart.js";
-import { Bar } from "react-chartjs-2";
+import { Line } from "react-chartjs-2";
 import {
   Table,
   TableBody,
@@ -37,10 +39,12 @@ import { Badge } from "@/components/ui/badge";
 ChartJS.register(
   CategoryScale,
   LinearScale,
-  BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 function StatCard({
@@ -141,57 +145,67 @@ export default function DashboardPage() {
             <h2 className="font-bold text-lg text-white">تحليل الحركات</h2>
             <div className="text-xs text-slate-400 bg-slate-800/50 px-3 py-1 rounded-full">آخر الحركات</div>
           </div>
-          {data.recentMovements.length === 0 ? (
-            <div className="text-sm text-slate-400 py-12 text-center">لا توجد حركات</div>
+          {!data.dailyMovements || data.dailyMovements.length === 0 ? (
+            <div className="text-sm text-slate-400 py-12 text-center">لا توجد بيانات كافية</div>
           ) : (
             <div style={{ height: "300px", position: "relative" }}>
-              <Bar
+              <Line
                 data={{
-                  labels: data.recentMovements.map(m => m.productName),
+                  labels: data.dailyMovements.map(m => {
+                    const date = new Date(m.date);
+                    return date.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' });
+                  }),
                   datasets: [
                     {
-                      label: "الكمية",
-                      data: data.recentMovements.map(m => m.quantity),
-                      backgroundColor: data.recentMovements.map(m => 
-                        m.type === "in" ? "rgba(34, 197, 94, 0.8)" : "rgba(239, 68, 68, 0.8)"
-                      ),
-                      borderColor: data.recentMovements.map(m => 
-                        m.type === "in" ? "rgba(22, 163, 74, 1)" : "rgba(220, 38, 38, 1)"
-                      ),
-                      borderWidth: 2,
-                      borderRadius: 12,
-                      borderSkipped: false,
+                      label: "وارد",
+                      data: data.dailyMovements.map(m => m.in),
+                      borderColor: "rgba(34, 197, 94, 1)",
+                      backgroundColor: "rgba(34, 197, 94, 0.1)",
+                      borderWidth: 3,
+                      fill: true,
+                      tension: 0.4,
+                      pointBackgroundColor: "rgba(34, 197, 94, 1)",
+                      pointBorderColor: "#fff",
+                      pointBorderWidth: 2,
+                      pointRadius: 5,
+                      pointHoverRadius: 7,
+                    },
+                    {
+                      label: "صادر",
+                      data: data.dailyMovements.map(m => m.out),
+                      borderColor: "rgba(251, 146, 60, 1)",
+                      backgroundColor: "rgba(251, 146, 60, 0.1)",
+                      borderWidth: 3,
+                      fill: true,
+                      tension: 0.4,
+                      pointBackgroundColor: "rgba(251, 146, 60, 1)",
+                      pointBorderColor: "#fff",
+                      pointBorderWidth: 2,
+                      pointRadius: 5,
+                      pointHoverRadius: 7,
                     }
                   ]
                 }}
                 options={{
                   responsive: true,
                   maintainAspectRatio: false,
+                  interaction: {
+                    mode: 'index',
+                    intersect: false,
+                  },
                   plugins: {
                     legend: {
                       display: true,
                       position: 'top',
+                      align: 'end',
                       labels: {
                         color: '#F9FAFB',
-                        generateLabels: function(chart) {
-                          return [
-                            {
-                              text: 'وارد',
-                              fillStyle: 'rgba(34, 197, 94, 0.8)',
-                              strokeStyle: 'rgba(22, 163, 74, 1)',
-                              lineWidth: 2,
-                              hidden: false,
-                              index: 0
-                            },
-                            {
-                              text: 'صادر',
-                              fillStyle: 'rgba(239, 68, 68, 0.8)',
-                              strokeStyle: 'rgba(220, 38, 38, 1)',
-                              lineWidth: 2,
-                              hidden: false,
-                              index: 1
-                            }
-                          ];
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 20,
+                        font: {
+                          size: 12,
+                          weight: "bold"
                         }
                       }
                     },
@@ -206,13 +220,7 @@ export default function DashboardPage() {
                       displayColors: true,
                       callbacks: {
                         label: function(context) {
-                          const movement = data.recentMovements[context.dataIndex];
-                          return [
-                            `النوع: ${movement.type === 'in' ? 'وارد' : 'صادر'}`,
-                            `الكمية: ${movement.quantity}`,
-                            `السعر: ${fmtMoney(movement.price, currency)}`,
-                            `الإجمالي: ${fmtMoney(movement.total, currency)}`
-                          ];
+                          return `${context.dataset.label}: ${fmtMoney(context.parsed.y, currency)}`;
                         }
                       }
                     }
@@ -220,7 +228,8 @@ export default function DashboardPage() {
                   scales: {
                     x: {
                       grid: {
-                        color: "#4B5563"
+                        color: "#4B5563",
+                        drawBorder: false,
                       },
                       ticks: {
                         color: "#D1D5DB",
@@ -232,13 +241,17 @@ export default function DashboardPage() {
                     },
                     y: {
                       grid: {
-                        color: "#4B5563"
+                        color: "#4B5563",
+                        drawBorder: false,
                       },
                       ticks: {
                         color: "#D1D5DB",
                         font: {
                           size: 12,
                           weight: "bold"
+                        },
+                        callback: function(value) {
+                          return fmtMoney(value, currency);
                         }
                       },
                       beginAtZero: true

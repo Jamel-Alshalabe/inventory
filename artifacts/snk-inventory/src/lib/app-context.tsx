@@ -84,7 +84,6 @@ const loadUserFromStorage = (): AuthUser | null => {
 
     return JSON.parse(stored);
   } catch (error) {
-    console.error("Error loading from storage:", error);
     return null;
   }
 };
@@ -124,33 +123,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
         saveUserToStorage(null);
       }
     } catch (error) {
-      console.error('Failed to refresh user:', error);
       
       // Check if it's an auth error (401/403)
       if (error && typeof error === 'object' && 'status' in error) {
         const status = (error as any).status;
         if (status === 401 || status === 403) {
-          if (options?.preserveSessionOnAuthError) {
+          // Always try to preserve session on auth errors unless explicitly told not to
+          if (options?.preserveSessionOnAuthError !== false) {
             const storedUser = loadUserFromStorage();
             const storedToken = getStoredToken();
 
-            if (storedUser) {
+            if (storedUser && storedToken) {
               setUser(storedUser);
               saveUserToStorage(storedUser, storedToken || undefined);
               return;
             }
           }
 
-          setUser(null);
-          saveUserToStorage(null);
+          // Only clear session if explicitly requested or no valid session exists
+          if (options?.preserveSessionOnAuthError === false) {
+            setUser(null);
+            saveUserToStorage(null);
+          }
           return;
         }
       }
 
+      // For other errors, try to preserve existing session
       const storedUser = loadUserFromStorage();
       const storedToken = getStoredToken();
 
-      if (storedUser) {
+      if (storedUser && storedToken) {
         setUser(storedUser);
         saveUserToStorage(storedUser, storedToken || undefined);
       } else {
@@ -183,7 +186,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const updated = await api.updateSettings(newSettings);
       setSettings(updated);
     } catch (error) {
-      console.error("Failed to update settings:", error);
       throw error;
     }
   }, []);
@@ -235,7 +237,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
               try {
                 await refreshUser({ preserveSessionOnAuthError: true });
               } catch (refreshError) {
-                console.warn("API refresh failed, but keeping stored user:", refreshError);
+                // Ensure we preserve the session even on refresh errors
+                setUser(storedUser);
                 saveUserToStorage(storedUser, storedToken);
               }
             }

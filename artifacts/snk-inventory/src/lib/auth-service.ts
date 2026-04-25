@@ -79,9 +79,13 @@ export class AuthService {
     try {
       return await api.getMe();
     } catch (error) {
-      // Only remove token on authentication errors (401)
+      // Only remove token on explicit authentication errors (401) with no session preservation
       if (error && typeof error === 'object' && 'status' in error && (error as any).status === 401) {
-        this.removeToken();
+        // Check if we have a valid token before removing it
+        if (!this.token) {
+          this.removeToken();
+        } else {
+        }
       }
       throw error;
     }
@@ -99,9 +103,13 @@ export class AuthService {
     try {
       await this.getCurrentUser();
     } catch (error) {
-      // Only remove token on authentication errors (401)
+      // Only remove token on explicit authentication errors (401) with no session preservation
       if (error && typeof error === 'object' && 'status' in error && (error as any).status === 401) {
-        this.removeToken();
+        // Check if we have a valid token before removing it
+        if (!this.token) {
+          this.removeToken();
+        } else {
+        }
       }
       throw error;
     }

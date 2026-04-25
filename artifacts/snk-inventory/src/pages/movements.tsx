@@ -124,11 +124,6 @@ function getMovementColumns(
 
 export default function MovementsPage({ type }: { type: "in" | "out" }) {
   const { selectedWarehouseId, user, settings } = useApp();
-  console.log('=== MOVEMENTS PAGE MOUNT ===');
-  console.log('Type:', type);
-  console.log('Selected Warehouse ID:', selectedWarehouseId);
-  console.log('User:', user);
-  console.log('Settings:', settings);
   
   const currency = settings.currency || "ج.م";
   const { toast } = useToast();
@@ -147,8 +142,6 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
       if (selectedWarehouseId) qs.set("warehouseId", String(selectedWarehouseId));
       qs.set("type", type);
       const url = `/api/movements?${qs.toString()}`;
-      console.log('Fetching movements with URL:', url);
-      console.log('Movement type:', type, 'Warehouse ID:', selectedWarehouseId);
       return customFetch<Movement[]>(url);
     },
   });
@@ -156,12 +149,7 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
   const { data: products = [] } = useQuery({
     queryKey: ["products", selectedWarehouseId, ""],
     queryFn: () => {
-      console.log('=== PRODUCTS QUERY CALLED ===');
-      console.log('Fetching products for movements with warehouseId:', selectedWarehouseId);
-      const url = `/api/products${warehouseQuery(selectedWarehouseId)}`;
-      console.log('Products URL:', url);
-      console.log('User:', user);
-      console.log('Selected Warehouse ID:', selectedWarehouseId);
+      const url = selectedWarehouseId ? `/api/products?warehouseId=${selectedWarehouseId}` : '/api/products';
       return customFetch<Product[]>(url);
     },
     enabled: !!user && !!selectedWarehouseId,
@@ -180,42 +168,21 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
       const movementQuantity = Number(quantity);
       const currentQuantity = selectedProduct.quantity;
 
-      console.log('Creating movement:', {
-        type,
-        productCode,
-        quantity: movementQuantity,
-        price: Number(price),
-        warehouseId: selectedWarehouseId,
-        currentProductQuantity: currentQuantity
-      });
-
       // Validate quantity for outbound movements
       if (type === "out" && movementQuantity > currentQuantity) {
         throw new Error(`الكمية المطلوبة (${movementQuantity}) أكبر من الكمية المتاحة (${currentQuantity})`);
       }
 
-      if (movementQuantity <= 0) {
-        throw new Error("الكمية يجب أن تكون أكبر من صفر");
-      }
-
-      return customFetch<Movement>("/api/movements", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type,
-          productCode,
-          quantity: movementQuantity,
-          price: Number(price),
-          warehouseId: selectedWarehouseId,
-        }),
+      return api.createMovement({
+        type,
+        productCode,
+        quantity: movementQuantity,
+        price: Number(price),
+        warehouseId: selectedWarehouseId || undefined,
       });
     },
     onSuccess: () => {
-      toast({ 
-        title: type === "in" ? "تم تسجيل الوارد" : "تم تسجيل الصادر",
-        variant: "default",
-        className: "bg-green-500 text-white border-green-600"
-      });
+      toast({ title: `تم تسجيل ${type === "in" ? "الوارد" : "الصادر"}` });
       qc.invalidateQueries({ queryKey: ["movements"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -224,13 +191,13 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
       setQuantity("1");
       setPrice("0");
     },
-    onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => {
+      toast({ title: "خطأ", description: e.message, variant: "destructive" });
+    },
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => customFetch(`/api/movements/${id}`, {
-      method: 'DELETE',
-    }),
+    mutationFn: (id: number) => api.deleteMovement(id),
     onSuccess: () => {
       toast({ 
         title: "تم الحذف",

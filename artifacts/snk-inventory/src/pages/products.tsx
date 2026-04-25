@@ -45,7 +45,6 @@ export default function ProductsPage() {
   const { data: dataResponse, isLoading } = useQuery({
     queryKey: ["products", selectedWarehouseId],
     queryFn: () => {
-      console.log('Fetching products with warehouseId:', selectedWarehouseId);
       return api.listProducts(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
     },
     retry: 2,
@@ -147,7 +146,6 @@ export default function ProductsPage() {
       quantity: Number(create.quantity),
       warehouseId: selectedWarehouseId,
     };
-    console.log('Creating product with data:', productData);
     createMut.mutate(productData);
   };
 
@@ -193,12 +191,10 @@ export default function ProductsPage() {
   };
 
   const handleDelete = (productId: number, productName: string) => {
-    console.log('Attempting to delete product:', { productId, productName });
     confirm({
       title: "حذف المنتج",
       description: `هل أنت متأكد من حذف "${productName}"؟`,
       onConfirm: () => {
-        console.log('Confirmed delete for product:', productId);
         deleteMut.mutate(productId);
       },
     });
@@ -219,7 +215,6 @@ export default function ProductsPage() {
   }
 
   // Debug user role and permissions
-  console.log('Current user:', { role: user.role, permissions: user.permissions });
 
   return (
     <div className="p-6 space-y-6" style={{background: "linear-gradient(135deg, #08081a 0%, #0d0d1a 50%, #121230 100%)"}}>
@@ -377,7 +372,6 @@ export default function ProductsPage() {
                                 variant="ghost"
                                 className="text-red-400 hover:text-red-300"
                                 onClick={() => {
-                                  console.log('Delete button clicked for product:', product.id);
                                   handleDelete(product.id, product.name);
                                 }}
                               >

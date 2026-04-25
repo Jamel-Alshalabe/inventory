@@ -365,29 +365,14 @@ export async function customFetch<T = unknown>(
   // Authorization header has been explicitly provided.
   if (_authTokenGetter && !headers.has("authorization")) {
     const token = await _authTokenGetter();
-    console.log('Token retrieved:', token ? 'yes (length: ' + token.length + ')' : 'no');
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
-      console.log('Authorization header set');
     }
   }
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  // Debug: Log all requests
-  const headerObj: Record<string, string> = {};
-  headers.forEach((value, key) => {
-    headerObj[key] = value;
-  });
-  
-  
-
   const response = await fetch(input, { ...init, method, headers, credentials: 'include' });
-
-  const responseHeaderObj: Record<string, string> = {};
-  response.headers.forEach((value, key) => {
-    responseHeaderObj[key] = value;
-  });
 
  
   if (!response.ok) {

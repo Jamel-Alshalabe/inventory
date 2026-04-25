@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type AuthUser } from "@/lib/api";
+import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import { useApp } from "@/lib/app-context";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -91,7 +92,6 @@ export default function UsersPage() {
 
   const createMut = useMutation({
     mutationFn: async () => {
-      console.log('Frontend Debug - State values:', { username, password, role, warehouseId, maxWarehouses });
       
       const requestData = {
         username,
@@ -102,14 +102,12 @@ export default function UsersPage() {
         permissions: selectedPermissions,
       };
       
-      console.log('Frontend Debug - Creating user with data:', requestData);
       
       try {
         const response = await api.createUser(requestData);
         
         return response;
       } catch (error) {
-        console.error('Frontend Debug - Error:', error);
         throw error;
       }
     },
@@ -380,7 +378,7 @@ export default function UsersPage() {
                             setRole(u.role as "admin" | "user" | "editor");
                             setWarehouseId(u.assignedWarehouseId?.toString() || "");
                             setMaxWarehouses(u.max_warehouses || 1);
-                            setSelectedPermissions(u.permissions || []);
+                            setSelectedPermissions((u as any).permissions || []);
                             setEditOpen(true);
                           }}
                         >

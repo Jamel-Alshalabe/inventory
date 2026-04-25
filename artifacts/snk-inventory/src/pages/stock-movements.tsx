@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp, warehouseQuery } from "@/lib/app-context";
 import { api, fmtDate, fmtMoney, type Movement, type Product } from "@/lib/api";
@@ -145,10 +145,6 @@ function getStockMovementColumns(
 
 export default function StockMovementsPage() {
   const { selectedWarehouseId, user, settings } = useApp();
-  console.log('=== STOCK MOVEMENTS PAGE MOUNT ===');
-  console.log('Selected Warehouse ID:', selectedWarehouseId);
-  console.log('User:', user);
-  console.log('Settings:', settings);
   
   const currency = settings.currency || "ج.م";
   const { toast } = useToast();
@@ -172,22 +168,15 @@ export default function StockMovementsPage() {
     },
   });
 
-  // Log movements data for debugging
   useEffect(() => {
     if (movementsResponse && typeof movementsResponse === 'object') {
-      console.log('Has data property?', 'data' in movementsResponse);
       if ('data' in movementsResponse) {
-        console.log('Data.data:', movementsResponse.data);
-        console.log('Data.data is array?', Array.isArray(movementsResponse.data));
       }
     }
   }, [movementsResponse]);
 
-  // Log movements error for debugging
   useEffect(() => {
     if (movementsError) {
-      console.log('=== MOVEMENTS QUERY ERROR ===');
-      console.log('Error:', movementsError);
     }
   }, [movementsError]);
 
@@ -222,8 +211,6 @@ export default function StockMovementsPage() {
         warehouseId: selectedWarehouseId,
       };
       
-      console.log('Payload:', payload);
-      console.log('Calling createMovement API');
       
       return api.createMovement(payload);
     },
@@ -238,28 +225,21 @@ export default function StockMovementsPage() {
       setPrice("0");
     },
     onError: (e: Error) => {
-      console.log('=== MOVEMENT CREATION ERROR ===');
-      console.log('Error:', e);
       toast({ title: "خطأ", description: e.message, variant: "destructive" });
     },
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => {
-      console.log('=== DELETE MOVEMENT CALLED ===');
-      console.log('Movement ID:', id);
       return api.deleteMovement(id);
     },
     onSuccess: () => {
-      console.log('=== MOVEMENT DELETED SUCCESSFULLY ===');
       toast({ title: "تم حذف الحركة وتحديث كمية المنتج" });
       qc.invalidateQueries({ queryKey: ["movements"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
     onError: (e: Error) => {
-      console.log('=== MOVEMENT DELETION ERROR ===');
-      console.log('Error:', e);
       toast({ title: "خطأ", description: e.message, variant: "destructive" });
     },
   });
@@ -670,10 +650,6 @@ export default function StockMovementsPage() {
               </Button>
               <Button
                 onClick={() => {
-                  console.log('=== SAVE BUTTON CLICKED ===');
-                  console.log('productCode:', productCode);
-                  console.log('createMut.isPending:', createMut.isPending);
-                  console.log('Button disabled:', !productCode || createMut.isPending);
                   createMut.mutate();
                 }}
                 disabled={!productCode || createMut.isPending}
