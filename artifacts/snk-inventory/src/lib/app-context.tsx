@@ -19,6 +19,7 @@ type AppContextValue = {
   refreshUser: () => Promise<void>;
   refreshWarehouses: () => Promise<void>;
   refreshSettings: () => Promise<void>;
+  updateSettings: (newSettings: Record<string, string>) => Promise<void>;
   login: (u: string, p: string) => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -177,6 +178,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateSettings = useCallback(async (newSettings: Record<string, string>) => {
+    try {
+      const updated = await api.updateSettings(newSettings);
+      setSettings(updated);
+    } catch (error) {
+      console.error("Failed to update settings:", error);
+      throw error;
+    }
+  }, []);
+
   const login = useCallback(
     async (username: string, password: string) => {
       const response = await api.login({ username, password });
@@ -258,10 +269,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
     const saved = localStorage.getItem(STORAGE_KEYS.warehouse);
-    if (saved && warehouses.find((w) => w.id === Number(saved))) {
+    const warehousesArray = Array.isArray(warehouses) ? warehouses : (warehouses?.data || []);
+    if (saved && warehousesArray.find((w) => w.id === Number(saved))) {
       setSelectedWarehouseIdRaw(Number(saved));
-    } else if (warehouses.length > 0 && selectedWarehouseId === null) {
-      setSelectedWarehouseIdRaw(warehouses[0].id);
+    } else if (warehousesArray.length > 0 && selectedWarehouseId === null) {
+      setSelectedWarehouseIdRaw(warehousesArray[0].id);
     }
   }, [user, warehouses, selectedWarehouseId]);
 
@@ -276,6 +288,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       refreshUser,
       refreshWarehouses,
       refreshSettings,
+      updateSettings,
       login,
       logout,
     }),
@@ -289,6 +302,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       refreshUser,
       refreshWarehouses,
       refreshSettings,
+      updateSettings,
       login,
       logout,
     ],
@@ -304,5 +318,5 @@ export function useApp(): AppContextValue {
 }
 
 export function warehouseQuery(id: number | null): string {
-  return id ? `?warehouse_id=${id}` : "";
+  return id ? `?warehouseId=${id}` : "";
 }

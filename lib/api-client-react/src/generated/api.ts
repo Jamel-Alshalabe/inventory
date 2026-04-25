@@ -688,7 +688,7 @@ export const updateProduct = async (
 ): Promise<Product> => {
   return customFetch<Product>(getUpdateProductUrl(id), {
     ...options,
-    method: "PUT",
+    method: "PATCH",
     headers: { "Content-Type": "application/json", ...options?.headers },
     body: JSON.stringify(updateProductBody),
   });

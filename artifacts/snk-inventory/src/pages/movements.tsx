@@ -124,6 +124,12 @@ function getMovementColumns(
 
 export default function MovementsPage({ type }: { type: "in" | "out" }) {
   const { selectedWarehouseId, user, settings } = useApp();
+  console.log('=== MOVEMENTS PAGE MOUNT ===');
+  console.log('Type:', type);
+  console.log('Selected Warehouse ID:', selectedWarehouseId);
+  console.log('User:', user);
+  console.log('Settings:', settings);
+  
   const currency = settings.currency || "ج.م";
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -140,28 +146,70 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
       const qs = new URLSearchParams();
       if (selectedWarehouseId) qs.set("warehouseId", String(selectedWarehouseId));
       qs.set("type", type);
-      return customFetch<Movement[]>(`/api/movements?${qs.toString()}`);
+      const url = `/api/movements?${qs.toString()}`;
+      console.log('Fetching movements with URL:', url);
+      console.log('Movement type:', type, 'Warehouse ID:', selectedWarehouseId);
+      return customFetch<Movement[]>(url);
     },
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", selectedWarehouseId, ""],
-    queryFn: () => customFetch<Product[]>(`/api/products${warehouseQuery(selectedWarehouseId)}`),
+    queryFn: () => {
+      console.log('=== PRODUCTS QUERY CALLED ===');
+      console.log('Fetching products for movements with warehouseId:', selectedWarehouseId);
+      const url = `/api/products${warehouseQuery(selectedWarehouseId)}`;
+      console.log('Products URL:', url);
+      console.log('User:', user);
+      console.log('Selected Warehouse ID:', selectedWarehouseId);
+      return customFetch<Product[]>(url);
+    },
+    enabled: !!user && !!selectedWarehouseId,
+    retry: 2,
+    staleTime: 30000,
   });
 
   const createMut = useMutation({
-    mutationFn: () =>
-      customFetch<Movement>("/api/movements", {
+    mutationFn: () => {
+      // Find the selected product to get current quantity
+      const selectedProduct = products.find(p => p.code === productCode);
+      if (!selectedProduct) {
+        throw new Error("المنتج المحدد غير موجود");
+      }
+
+      const movementQuantity = Number(quantity);
+      const currentQuantity = selectedProduct.quantity;
+
+      console.log('Creating movement:', {
+        type,
+        productCode,
+        quantity: movementQuantity,
+        price: Number(price),
+        warehouseId: selectedWarehouseId,
+        currentProductQuantity: currentQuantity
+      });
+
+      // Validate quantity for outbound movements
+      if (type === "out" && movementQuantity > currentQuantity) {
+        throw new Error(`الكمية المطلوبة (${movementQuantity}) أكبر من الكمية المتاحة (${currentQuantity})`);
+      }
+
+      if (movementQuantity <= 0) {
+        throw new Error("الكمية يجب أن تكون أكبر من صفر");
+      }
+
+      return customFetch<Movement>("/api/movements", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type,
           productCode,
-          quantity: Number(quantity),
+          quantity: movementQuantity,
           price: Number(price),
           warehouseId: selectedWarehouseId,
         }),
-      }),
+      });
+    },
     onSuccess: () => {
       toast({ 
         title: type === "in" ? "تم تسجيل الوارد" : "تم تسجيل الصادر",
@@ -247,15 +295,23 @@ export default function MovementsPage({ type }: { type: "in" | "out" }) {
                     <Label>الكمية</Label>
                     <Input
                       type="number"
+                      min="1"
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value)}
                       data-testid="input-qty"
                     />
+                    {type === "out" && productCode && (
+                      <p className="text-xs text-muted-foreground">
+                        الكمية المتاحة: {products.find(p => p.code === productCode)?.quantity || 0}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>السعر</Label>
                     <Input
                       type="number"
+                      min="0"
+                      step="0.01"
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
                       data-testid="input-price"

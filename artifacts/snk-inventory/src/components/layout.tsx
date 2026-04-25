@@ -6,6 +6,7 @@ import {
   ArrowUpDown,
   FileText,
   Warehouse as WarehouseIcon,
+  Building2,
   Users,
   Settings as SettingsIcon,
   ScrollText,
@@ -55,7 +56,7 @@ const NAV: NavItem[] = [
   { href: "/stock-movements", label: "حركة المخزون", icon: ArrowUpDown, permissions: ["view-movements"] },
   { href: "/invoices", label: "الفواتير", icon: FileText, permissions: ["view-invoices"] },
   { href: "/reports", label: "التقارير", icon: BarChart3, permissions: ["view-reports"] },
-  { href: "/warehouses", label: "المخازن", icon: WarehouseIcon, permissions: ["manage-warehouses"] },
+  { href: "/warehouses", label: "المخازن", icon: WarehouseIcon, permissions: ["view-warehouses"] },
   { href: "/users", label: "المستخدمين", icon: Users, permissions: ["view-users"] },
   { href: "/subscriptions", label: "الاشتراكات", icon: CreditCard, role: "super_admin" },
   { href: "/settings", label: "الإعدادات", icon: SettingsIcon, permissions: ["manage-settings"] },
@@ -98,7 +99,12 @@ export function Layout({ children }: { children: ReactNode }) {
   });
 
   const lockedWarehouse = user.role === "user" && !!user.assignedWarehouseId;
-  const currentName = settings.companyName || "شركة سنك";
+  const currentName = settings.companyName || "company name";
+  
+  // Extract warehouses data properly (handle both array and { data: [] } structures)
+  const warehousesArray = Array.isArray(warehouses) ? warehouses : (warehouses?.data || []);
+  
+ 
 
   return (
     <div className="min-h-screen flex bg-background text-foreground" dir="rtl">
@@ -123,7 +129,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="px-5 py-5 border-b border-slate-800/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="size-12 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 text-white flex items-center justify-center font-bold text-lg shadow-lg">
-              سنك
+              <Building2 className="size-7" />
             </div>
             <div className="min-w-0">
               <div className="font-bold truncate text-white text-base" data-testid="text-company-name">
@@ -190,13 +196,13 @@ export function Layout({ children }: { children: ReactNode }) {
               <Select
                 value={selectedWarehouseId ? String(selectedWarehouseId) : ""}
                 onValueChange={(v) => setSelectedWarehouseId(v ? Number(v) : null)}
-                disabled={lockedWarehouse || !Array.isArray(warehouses) || warehouses.length === 0}
+                disabled={lockedWarehouse || !Array.isArray(warehousesArray) || warehousesArray.length === 0}
               >
                 <SelectTrigger className="w-32 md:w-48" data-testid="select-warehouse">
                   <SelectValue placeholder="اختر المخزن" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Array.isArray(warehouses) ? warehouses.map((w) => (
+                  {Array.isArray(warehousesArray) ? warehousesArray.map((w) => (
                     <SelectItem key={w.id} value={String(w.id)}>
                       {w.name}
                     </SelectItem>
@@ -210,13 +216,13 @@ export function Layout({ children }: { children: ReactNode }) {
               <Select
                 value={selectedWarehouseId ? String(selectedWarehouseId) : ""}
                 onValueChange={(v) => setSelectedWarehouseId(v ? Number(v) : null)}
-                disabled={lockedWarehouse || !Array.isArray(warehouses) || warehouses.length === 0}
+                disabled={lockedWarehouse || !Array.isArray(warehousesArray) || warehousesArray.length === 0}
               >
                 <SelectTrigger className="w-24" data-testid="select-warehouse-mobile">
                   <SelectValue placeholder="مخزن" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Array.isArray(warehouses) ? warehouses.map((w) => (
+                  {Array.isArray(warehousesArray) ? warehousesArray.map((w) => (
                     <SelectItem key={w.id} value={String(w.id)}>
                       {w.name}
                     </SelectItem>
@@ -230,13 +236,13 @@ export function Layout({ children }: { children: ReactNode }) {
             {/* User Profile Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-3 px-2 hover:bg-accent/50">
+                <Button variant="ghost" className="flex items-center gap-3 px-2 ">
                   <div className="text-right hidden sm:block">
                     <div className="text-sm font-medium text-foreground">
                       {user.username}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {user.email || `${user.username}@snk.com`}
+                      {user.username}
                     </div>
                   </div>
                   <Avatar className="size-9 border border-border">
@@ -252,15 +258,12 @@ export function Layout({ children }: { children: ReactNode }) {
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium">{user.username}</p>
                     <p className="text-xs text-muted-foreground">
-                      {user.email || `${user.username}@snk.com`}
+                      { `${user.username}`}
                     </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-muted-foreground">
-                  <User className="mr-2 size-4" />
-                  {user.role === "admin" ? "مدير النظام" : user.role === "user" ? "مستخدم" : "مراجع"}
-                </DropdownMenuItem>
+               
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => void logout()}

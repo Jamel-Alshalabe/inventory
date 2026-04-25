@@ -18,7 +18,7 @@ export const sysUsersTable = pgTable("sys_users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  role: text("role").notNull(), // admin | user | auditor
+  role: text("role").notNull(), // admin | user | editor
   assignedWarehouseId: integer("assigned_warehouse_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

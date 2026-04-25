@@ -49,7 +49,7 @@ export type CreateUserBodyRole =
 export const CreateUserBodyRole = {
   admin: "admin",
   user: "user",
-  auditor: "auditor",
+  editor: "editor",
 } as const;
 
 export interface CreateUserBody {

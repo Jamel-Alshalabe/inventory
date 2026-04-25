@@ -29,7 +29,17 @@ export type AuthUser = {
   avatar?: string;
 };
 
-export type Warehouse = { id: number; name: string; productCount: number };
+export type Warehouse = { 
+  id: number; 
+  name: string; 
+  productCount: number;
+  admin_id?: number | null;
+  admin?: {
+    id: number;
+    username: string;
+  } | null;
+  createdAt?: string;
+};
 
 export type Product = {
   id: number;
@@ -92,10 +102,16 @@ export type DashboardStats = {
   outOfStock: number;
   totalInvoices: number;
   totalSales: number;
+  profit: number;
   todayIn: number;
   todayOut: number;
   recentMovements: Movement[];
-  topProducts: { productCode: string; productName: string; quantity: number }[];
+  topProducts: Array<{
+    productCode: string;
+    productName: string;
+    totalSold: number;
+    revenue: number;
+  }>;
   dailyMovements?: { date: string; in: number; out: number }[];
 };
 
@@ -108,6 +124,7 @@ import * as generatedApi from "../../../../lib/api-client-react/src/generated/ap
 
 // Import customFetch from the correct location
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
+import { ActivityLogItem } from "@/types/activity-log";
 
 // Add missing update user method using same pattern as createUser
 const updateUser = async (id: number, data: Partial<AuthUser>) => {
@@ -125,9 +142,49 @@ const deleteUser = async (id: number) => {
   });
 };
 
+// Add update movement function using same pattern as createUser
+const updateMovement = async (id: number, data: {
+  type: "in" | "out";
+  productCode: string;
+  quantity: number;
+  price: number;
+}) => {
+  return customFetch<Movement>(`/api/movements/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+};
+
+// Add settings functions - now using user-specific endpoints
+const getSettings = async () => {
+  return customFetch<Record<string, string>>('/api/user/settings', {
+    method: 'GET',
+  });
+};
+
+const updateSettings = async (settings: Record<string, string>) => {
+  return customFetch<Record<string, string>>('/api/user/settings', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+};
+
+// Add activity logs function
+const getLogs = async (limit: number = 50) => {
+  return customFetch<ActivityLogItem[]>(`/api/logs?limit=${limit}`, {
+    method: 'GET',
+  });
+};
+
 export const api = {
   ...generatedApi,
   updateUser,
   deleteUser,
+  updateMovement,
+  getSettings,
+  updateSettings,
+  getLogs,
 };
 

@@ -145,6 +145,11 @@ function getStockMovementColumns(
 
 export default function StockMovementsPage() {
   const { selectedWarehouseId, user, settings } = useApp();
+  console.log('=== STOCK MOVEMENTS PAGE MOUNT ===');
+  console.log('Selected Warehouse ID:', selectedWarehouseId);
+  console.log('User:', user);
+  console.log('Settings:', settings);
+  
   const currency = settings.currency || "ج.م";
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -158,29 +163,70 @@ export default function StockMovementsPage() {
   const [price, setPrice] = useState("0");
   const [filter, setFilter] = useState<MovementType>("all");
 
-  const { data: movements = [] } = useQuery({
+  const { data: movementsResponse = [], isLoading: movementsLoading, error: movementsError } = useQuery({
     queryKey: ["movements", "all", selectedWarehouseId],
     queryFn: () => {
-      const qs = new URLSearchParams();
-      if (selectedWarehouseId) qs.set("warehouseId", String(selectedWarehouseId));
-      return api.get<Movement[]>(`/movements?${qs.toString()}`);
+     
+      const params = selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined;
+      return api.listMovements(params);
     },
   });
 
-  const { data: products = [] } = useQuery({
+  // Log movements data for debugging
+  useEffect(() => {
+    if (movementsResponse && typeof movementsResponse === 'object') {
+      console.log('Has data property?', 'data' in movementsResponse);
+      if ('data' in movementsResponse) {
+        console.log('Data.data:', movementsResponse.data);
+        console.log('Data.data is array?', Array.isArray(movementsResponse.data));
+      }
+    }
+  }, [movementsResponse]);
+
+  // Log movements error for debugging
+  useEffect(() => {
+    if (movementsError) {
+      console.log('=== MOVEMENTS QUERY ERROR ===');
+      console.log('Error:', movementsError);
+    }
+  }, [movementsError]);
+
+  // Extract movements array from response
+  const movements = Array.isArray(movementsResponse) ? movementsResponse : (movementsResponse?.data || []);
+  
+ 
+  const { data: productsResponse = [] } = useQuery({
     queryKey: ["products", selectedWarehouseId, ""],
-    queryFn: () => api.get<Product[]>(`/products${warehouseQuery(selectedWarehouseId)}`),
+    queryFn: () => {
+    
+      const url = `/products${warehouseQuery(selectedWarehouseId)}`;
+      return api.listProducts(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
+    },
+    enabled: !!selectedWarehouseId,
+    retry: 2,
+    staleTime: 30000,
   });
 
+  // Extract products array from response
+  const products = Array.isArray(productsResponse) ? productsResponse : (productsResponse?.data || []);
+
   const createMut = useMutation({
-    mutationFn: () =>
-      api.post<Movement>("/movements", {
+    mutationFn: () => {
+    
+      
+      const payload = {
         type: movementType,
         productCode,
         quantity: Number(quantity),
         price: Number(price),
         warehouseId: selectedWarehouseId,
-      }),
+      };
+      
+      console.log('Payload:', payload);
+      console.log('Calling createMovement API');
+      
+      return api.createMovement(payload);
+    },
     onSuccess: () => {
       toast({ title: `تم تسجيل ${movementType === "in" ? "الوارد" : "الصادر"}` });
       qc.invalidateQueries({ queryKey: ["movements"] });
@@ -191,18 +237,31 @@ export default function StockMovementsPage() {
       setQuantity("1");
       setPrice("0");
     },
-    onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => {
+      console.log('=== MOVEMENT CREATION ERROR ===');
+      console.log('Error:', e);
+      toast({ title: "خطأ", description: e.message, variant: "destructive" });
+    },
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => api.del(`/movements/${id}`),
+    mutationFn: (id: number) => {
+      console.log('=== DELETE MOVEMENT CALLED ===');
+      console.log('Movement ID:', id);
+      return api.deleteMovement(id);
+    },
     onSuccess: () => {
-      toast({ title: "تم الحذف" });
+      console.log('=== MOVEMENT DELETED SUCCESSFULLY ===');
+      toast({ title: "تم حذف الحركة وتحديث كمية المنتج" });
       qc.invalidateQueries({ queryKey: ["movements"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => {
+      console.log('=== MOVEMENT DELETION ERROR ===');
+      console.log('Error:', e);
+      toast({ title: "خطأ", description: e.message, variant: "destructive" });
+    },
   });
 
   // Filter movements based on selected filter
@@ -610,7 +669,13 @@ export default function StockMovementsPage() {
                 إلغاء
               </Button>
               <Button
-                onClick={() => createMut.mutate()}
+                onClick={() => {
+                  console.log('=== SAVE BUTTON CLICKED ===');
+                  console.log('productCode:', productCode);
+                  console.log('createMut.isPending:', createMut.isPending);
+                  console.log('Button disabled:', !productCode || createMut.isPending);
+                  createMut.mutate();
+                }}
                 disabled={!productCode || createMut.isPending}
                 data-testid="button-save"
               >
@@ -622,13 +687,22 @@ export default function StockMovementsPage() {
       )}
 
       <Card className="p-5">
-        <DataTable
-          columns={getStockMovementColumns(currency, canEdit, deleteMut, confirm)}
-          data={filteredMovements}
-          searchKey="productName"
-          searchPlaceholder="بحث بالاسم أو الكود..."
-          emptyMessage="لا توجد حركات"
-        />
+        {movementsLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="text-muted-foreground">جاري تحميل الحركات...</span>
+            </div>
+          </div>
+        ) : (
+          <DataTable
+            columns={getStockMovementColumns(currency, canEdit, deleteMut, confirm)}
+            data={filteredMovements}
+            searchKey="productName"
+            searchPlaceholder="بحث بالاسم أو الكود..."
+            emptyMessage="لا توجد حركات"
+          />
+        )}
       </Card>
       
       <ConfirmationComponent isLoading={deleteMut.isPending} />

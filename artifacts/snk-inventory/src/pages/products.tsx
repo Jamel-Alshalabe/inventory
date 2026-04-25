@@ -39,20 +39,25 @@ export default function ProductsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [create, setCreate] = useState<FormState>(empty);
   const qc = useQueryClient();
-  const { confirm } = useConfirmation();
+  const { confirm, ConfirmationComponent } = useConfirmation();
   const { toast } = useToast();
 
-  const { data, isLoading } = useQuery({
+  const { data: dataResponse, isLoading } = useQuery({
     queryKey: ["products", selectedWarehouseId],
-    queryFn: () => api.listProducts(selectedWarehouseId ? { warehouse_id: selectedWarehouseId } : undefined),
+    queryFn: () => {
+      console.log('Fetching products with warehouseId:', selectedWarehouseId);
+      return api.listProducts(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
+    },
     retry: 2,
     staleTime: 30000,
   });
+  const data = Array.isArray(dataResponse) ? dataResponse : (dataResponse?.data || []);
 
   const createMut = useMutation({
     mutationFn: (data: Omit<Product, "id" | "createdAt" | "warehouseName">) => api.createProduct(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["/api/products"] });
       setCreateOpen(false);
       setCreate(empty);
       toast({
@@ -75,6 +80,7 @@ export default function ProductsPage() {
     mutationFn: ({ id, data }: { id: number; data: Partial<Product> }) => api.updateProduct(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["/api/products"] });
       setEditOpen(false);
       setEdit(empty);
       toast({
@@ -97,6 +103,7 @@ export default function ProductsPage() {
     mutationFn: api.deleteProduct,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["/api/products"] });
       toast({
         title: "نجاح",
         description: "تم حذف المنتج بنجاح",
@@ -132,14 +139,16 @@ export default function ProductsPage() {
       });
       return;
     }
-    createMut.mutate({
+    const productData = {
       name: create.name.trim(),
       code: create.code.trim(),
       buyPrice: Number(create.buyPrice),
       sellPrice: Number(create.sellPrice),
       quantity: Number(create.quantity),
       warehouseId: selectedWarehouseId,
-    });
+    };
+    console.log('Creating product with data:', productData);
+    createMut.mutate(productData);
   };
 
   const handleUpdate = () => {
@@ -184,10 +193,14 @@ export default function ProductsPage() {
   };
 
   const handleDelete = (productId: number, productName: string) => {
+    console.log('Attempting to delete product:', { productId, productName });
     confirm({
       title: "حذف المنتج",
       description: `هل أنت متأكد من حذف "${productName}"؟`,
-      onConfirm: () => deleteMut.mutate(productId),
+      onConfirm: () => {
+        console.log('Confirmed delete for product:', productId);
+        deleteMut.mutate(productId);
+      },
     });
   };
 
@@ -204,6 +217,9 @@ export default function ProductsPage() {
       </div>
     );
   }
+
+  // Debug user role and permissions
+  console.log('Current user:', { role: user.role, permissions: user.permissions });
 
   return (
     <div className="p-6 space-y-6" style={{background: "linear-gradient(135deg, #08081a 0%, #0d0d1a 50%, #121230 100%)"}}>
@@ -312,7 +328,6 @@ export default function ProductsPage() {
                 <th className="px-4 py-3 text-right font-medium">الكمية</th>
                 <th className="px-4 py-3 text-right font-medium">سعر الشراء</th>
                 <th className="px-4 py-3 text-right font-medium">سعر البيع</th>
-                <th className="px-4 py-3 text-right font-medium">المخزن</th>
                 <th className="px-4 py-3 text-right font-medium">إجراءات</th>
               </tr>
             </thead>
@@ -345,9 +360,7 @@ export default function ProductsPage() {
                       </td>
                       <td className="px-4 py-3 text-sm">{fmtMoney(product.buyPrice)}</td>
                       <td className="px-4 py-3 text-sm font-medium">{fmtMoney(product.sellPrice)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-400">
-                        {product.warehouseName || "-"}
-                      </td>
+                      
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {(user.role === "admin" || user.role === "user") && (
@@ -363,7 +376,10 @@ export default function ProductsPage() {
                                 size="icon"
                                 variant="ghost"
                                 className="text-red-400 hover:text-red-300"
-                                onClick={() => handleDelete(product.id, product.name)}
+                                onClick={() => {
+                                  console.log('Delete button clicked for product:', product.id);
+                                  handleDelete(product.id, product.name);
+                                }}
                               >
                                 <Trash2 className="size-4" />
                               </Button>
@@ -448,6 +464,9 @@ export default function ProductsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Confirmation Dialog */}
+      <ConfirmationComponent isLoading={deleteMut.isPending} />
     </div>
   );
 }

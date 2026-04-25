@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { useApp } from "@/lib/app-context";
 import { Button } from "@/components/ui/button";
+import { LogIn, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Loader2, LogIn } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function LoginPage() {
@@ -56,10 +56,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{background: "linear-gradient(135deg,#08081a 0%,#1a1a2e 50%,#0a246b 100%)"}} dir="rtl">
       <Card className="w-full max-w-md p-8 bg-[#16162b] shadow-[0_8px_32px_0_rgba(31,38,135,0.37)] backdrop-blur-md">
         <div className="text-center mb-6">
-          <div className="size-20 mx-auto rounded-xl bg-primary/15 text-primary flex items-center justify-center text-2xl font-bold mb-3">
-            سنك
+          <div className="size-20 mx-auto rounded-xl bg-primary/15 text-primary flex items-center justify-center text-xl font-bold mb-3">
+            <LogIn className="size-10" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-100">شركة سنك</h1>
+          <h1 className="text-2xl font-bold text-slate-100">تسجيل الدخول</h1>
           <p className="text-slate-400 text-sm mt-1">نظام إدارة مخزون قطع غيار السيارات</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">

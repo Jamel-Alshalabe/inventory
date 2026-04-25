@@ -504,7 +504,7 @@ components:
       properties:
         id: { type: integer }
         username: { type: string }
-        role: { type: string, enum: [admin, user, auditor] }
+        role: { type: string, enum: [admin, user, editor] }
         assignedWarehouseId: { type: integer, nullable: true }
         assignedWarehouseName: { type: string, nullable: true }
     AuthResponse:
@@ -525,7 +525,7 @@ components:
       properties:
         username: { type: string }
         password: { type: string }
-        role: { type: string, enum: [admin, user, auditor] }
+        role: { type: string, enum: [admin, user, editor] }
         assignedWarehouseId: { type: integer, nullable: true }
     Warehouse:
       type: object

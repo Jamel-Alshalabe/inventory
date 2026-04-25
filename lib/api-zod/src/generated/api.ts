@@ -39,7 +39,7 @@ export const GetMeResponse = zod.object({
       zod.object({
         id: zod.number(),
         username: zod.string(),
-        role: zod.enum(["admin", "user", "auditor"]),
+        role: zod.enum(["admin", "user", "editor"]),
         assignedWarehouseId: zod.number().nullish(),
         assignedWarehouseName: zod.string().nullish(),
       }),
@@ -354,7 +354,7 @@ export const DeleteWarehouseResponse = zod.object({
 export const ListUsersResponseItem = zod.object({
   id: zod.number(),
   username: zod.string(),
-  role: zod.enum(["admin", "user", "auditor"]),
+  role: zod.enum(["admin", "user", "editor"]),
   assignedWarehouseId: zod.number().nullish(),
   assignedWarehouseName: zod.string().nullish(),
 });
@@ -363,14 +363,14 @@ export const ListUsersResponse = zod.array(ListUsersResponseItem);
 export const CreateUserBody = zod.object({
   username: zod.string(),
   password: zod.string(),
-  role: zod.enum(["admin", "user", "auditor"]),
+  role: zod.enum(["admin", "user", "editor"]),
   assignedWarehouseId: zod.number().nullish(),
 });
 
 export const CreateUserResponse = zod.object({
   id: zod.number(),
   username: zod.string(),
-  role: zod.enum(["admin", "user", "auditor"]),
+  role: zod.enum(["admin", "user", "editor"]),
   assignedWarehouseId: zod.number().nullish(),
   assignedWarehouseName: zod.string().nullish(),
 });

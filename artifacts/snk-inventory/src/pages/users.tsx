@@ -31,8 +31,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Edit, Eye } from "lucide-react";
+import { Plus, Trash2, Edit, Eye, Shield } from "lucide-react";
 
 export default function UsersPage() {
   const { warehouses, user: me } = useApp();
@@ -51,9 +52,10 @@ export default function UsersPage() {
     : "المستخدمين التابعين لك";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "user" | "auditor">("user");
+  const [role, setRole] = useState<"admin" | "user" | "editor">("user");
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [maxWarehouses, setMaxWarehouses] = useState<number>(1);
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   
   
   const { data: response = { data: [] }, isLoading, isFetching } = useQuery({
@@ -68,6 +70,22 @@ export default function UsersPage() {
   // Loading state
   const isDataLoading = isLoading || (isFetching && users.length === 0);
 
+  // Fetch available permissions
+  const { data: permissionsResponse = { permissions: [] } } = useQuery({
+    queryKey: ["permissions"],
+    queryFn: () => customFetch<{ permissions: Array<{ id: number; name: string; display_name: string }> }>("/api/users/permissions"),
+    enabled: me?.role === 'admin' || me?.role === 'super_admin',
+  });
+
+  const availablePermissions = permissionsResponse.permissions || [];
+
+  // Type for permission object
+  type Permission = {
+    id: number;
+    name: string;
+    display_name: string;
+  };
+
   // Debug: Log users data
  
 
@@ -81,6 +99,7 @@ export default function UsersPage() {
         role,
         assignedWarehouseId: warehouseId ? Number(warehouseId) : null,
         max_warehouses: maxWarehouses,
+        permissions: selectedPermissions,
       };
       
       console.log('Frontend Debug - Creating user with data:', requestData);
@@ -107,6 +126,7 @@ export default function UsersPage() {
       setRole("user");
       setWarehouseId("");
       setMaxWarehouses(1);
+      setSelectedPermissions([]);
     },
     onError: (error: any) => {
       toast({ 
@@ -148,6 +168,7 @@ export default function UsersPage() {
       setPassword("");
       setRole("user");
       setMaxWarehouses(1);
+      setSelectedPermissions([]);
     },
     onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
   });
@@ -197,7 +218,7 @@ export default function UsersPage() {
                   <SelectContent>
                     <SelectItem value="admin">مدير</SelectItem>
                     <SelectItem value="user">مستخدم</SelectItem>
-                    <SelectItem value="auditor">مراجع حسابات</SelectItem>
+                    <SelectItem value="editor">مراجع حسابات</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -213,6 +234,44 @@ export default function UsersPage() {
                 />
               </div>
             </div>
+            
+            {/* Permissions Section - Only for Admins */}
+            {(me?.role === 'admin' || me?.role === 'super_admin') && (
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center gap-2">
+                  <Shield className="size-4 text-primary" />
+                  <Label className="text-base font-medium">الصلاحيات</Label>
+                </div>
+                <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto border rounded-md p-3">
+                  {availablePermissions.map((permission: Permission) => (
+                    <div key={permission.id} className="flex items-center space-gap-2 space-x-2">
+                      <Checkbox
+                        id={`permission-${permission.id}`}
+                        checked={selectedPermissions.includes(permission.name)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedPermissions([...selectedPermissions, permission.name]);
+                          } else {
+                            setSelectedPermissions(selectedPermissions.filter(p => p !== permission.name));
+                          }
+                        }}
+                      />
+                      <Label 
+                        htmlFor={`permission-${permission.id}`} 
+                        className="text-sm cursor-pointer"
+                      >
+                        {permission.display_name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                {selectedPermissions.length > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    تم اختيار {selectedPermissions.length} صلاحية
+                  </div>
+                )}
+              </div>
+            )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>
                 إلغاء
@@ -294,7 +353,7 @@ export default function UsersPage() {
                         : "bg-muted"
                     }
                   >
-                    {u.role === "admin" ? "مدير" : u.role === "user" ? "مستخدم" : u.role === "auditor" ? "مراجع حسابات" : u.role}
+                    {u.role === "admin" ? "مدير" : u.role === "user" ? "مستخدم" : u.role === "editor" ? "مراجع حسابات" : u.role}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">{u.max_warehouses || 1}</TableCell>
@@ -318,9 +377,10 @@ export default function UsersPage() {
                           onClick={() => {
                             setSelectedUser(u);
                             setUsername(u.username);
-                            setRole(u.role as "admin" | "user" | "auditor");
+                            setRole(u.role as "admin" | "user" | "editor");
                             setWarehouseId(u.assignedWarehouseId?.toString() || "");
                             setMaxWarehouses(u.max_warehouses || 1);
+                            setSelectedPermissions(u.permissions || []);
                             setEditOpen(true);
                           }}
                         >
@@ -380,7 +440,7 @@ export default function UsersPage() {
                 <SelectContent>
                   <SelectItem value="admin">مدير</SelectItem>
                   <SelectItem value="user">مستخدم</SelectItem>
-                  <SelectItem value="auditor">مراجع حسابات</SelectItem>
+                  <SelectItem value="editor">مراجع حسابات</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -394,6 +454,44 @@ export default function UsersPage() {
               />
             </div>
           </div>
+          
+          {/* Permissions Section - Only for Admins */}
+          {(me?.role === 'admin' || me?.role === 'super_admin') && (
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex items-center gap-2">
+                <Shield className="size-4 text-primary" />
+                <Label className="text-base font-medium">الصلاحيات</Label>
+              </div>
+              <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto border rounded-md p-3">
+                {availablePermissions.map((permission: Permission) => (
+                  <div key={permission.id} className="flex items-center space-gap-2 space-x-2">
+                    <Checkbox
+                      id={`edit-permission-${permission.id}`}
+                      checked={selectedPermissions.includes(permission.name)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedPermissions([...selectedPermissions, permission.name]);
+                        } else {
+                          setSelectedPermissions(selectedPermissions.filter(p => p !== permission.name));
+                        }
+                      }}
+                    />
+                    <Label 
+                      htmlFor={`edit-permission-${permission.id}`} 
+                      className="text-sm cursor-pointer"
+                    >
+                      {permission.display_name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              {selectedPermissions.length > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  تم اختيار {selectedPermissions.length} صلاحية
+                </div>
+              )}
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               إلغاء
@@ -405,6 +503,7 @@ export default function UsersPage() {
                 role: role as any,
                 assignedWarehouseId: warehouseId ? parseInt(warehouseId) : null,
                 maxWarehouses: maxWarehouses,
+                permissions: selectedPermissions,
               })}
               disabled={!username || updateMut.isPending}
               data-testid="button-update"
@@ -432,7 +531,7 @@ export default function UsersPage() {
                 <p className="font-semibold">
                   {(selectedUser?.role as any) === "admin" ? "مدير" : 
                    (selectedUser?.role as any) === "user" ? "مستخدم" : 
-                   (selectedUser?.role as any) === "auditor" ? "مراجع حسابات" : selectedUser?.role}
+                   (selectedUser?.role as any) === "editor" ? "مراجع حسابات" : selectedUser?.role}
                 </p>
               </div>
               

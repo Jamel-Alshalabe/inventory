@@ -12,6 +12,7 @@ import {
   DollarSign,
   FileText,
   Boxes,
+  TrendingUp as ProfitIcon,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -120,58 +121,43 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="إجمالي المنتجات" value={String(data.totalProducts)} icon={Package} />
         <StatCard
-          label="قيمة المخزون"
+          label="اجمالي المخزون"
           value={fmtMoney(data.stockValue, currency)}
           icon={DollarSign}
           tone="accent"
         />
-        <StatCard label="عدد القطع" value={String(data.totalQuantity)} icon={Boxes} />
         <StatCard label="إجمالي المبيعات" value={fmtMoney(data.totalSales, currency)} icon={FileText} tone="accent" />
-        <StatCard
-          label="منتجات منخفضة"
-          value={String(data.lowStock)}
-          icon={AlertTriangle}
-          tone="warning"
-        />
-        <StatCard
-          label="نفد المخزون"
-          value={String(data.outOfStock)}
-          icon={XCircle}
-          tone="destructive"
-        />
-        <StatCard
-          label="وارد اليوم"
-          value={fmtMoney(data.todayIn, currency)}
-          icon={TrendingDown}
-          tone="accent"
-        />
-        <StatCard
-          label="صادر اليوم"
-          value={fmtMoney(data.todayOut, currency)}
-          icon={TrendingUp}
-          tone="warning"
+        <StatCard 
+          label="الأرباح" 
+          value={fmtMoney(data.profit || 0, currency)} 
+          icon={ProfitIcon} 
+          tone="primary" 
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         <Card className="p-6 lg:col-span-2 bg-gradient-to-br from-[#0f0f23] to-[#1a1a2e] border border-slate-700/50 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="font-bold text-lg text-white">أكثر المنتجات مبيعاً</h2>
-            <div className="text-xs text-slate-400 bg-slate-800/50 px-3 py-1 rounded-full">هذا الشهر</div>
+            <h2 className="font-bold text-lg text-white">تحليل الحركات</h2>
+            <div className="text-xs text-slate-400 bg-slate-800/50 px-3 py-1 rounded-full">آخر الحركات</div>
           </div>
-          {data.topProducts.length === 0 ? (
-            <div className="text-sm text-slate-400 py-12 text-center">لا توجد بيانات</div>
+          {data.recentMovements.length === 0 ? (
+            <div className="text-sm text-slate-400 py-12 text-center">لا توجد حركات</div>
           ) : (
             <div style={{ height: "300px", position: "relative" }}>
               <Bar
                 data={{
-                  labels: data.topProducts.map(p => p.productName),
+                  labels: data.recentMovements.map(m => m.productName),
                   datasets: [
                     {
-                      label: "Quantity",
-                      data: data.topProducts.map(p => p.quantity),
-                      backgroundColor: "rgba(37, 99, 235, 0.8)",
-                      borderColor: "rgba(29, 78, 216, 1)",
+                      label: "الكمية",
+                      data: data.recentMovements.map(m => m.quantity),
+                      backgroundColor: data.recentMovements.map(m => 
+                        m.type === "in" ? "rgba(34, 197, 94, 0.8)" : "rgba(239, 68, 68, 0.8)"
+                      ),
+                      borderColor: data.recentMovements.map(m => 
+                        m.type === "in" ? "rgba(22, 163, 74, 1)" : "rgba(220, 38, 38, 1)"
+                      ),
                       borderWidth: 2,
                       borderRadius: 12,
                       borderSkipped: false,
@@ -183,7 +169,31 @@ export default function DashboardPage() {
                   maintainAspectRatio: false,
                   plugins: {
                     legend: {
-                      display: false
+                      display: true,
+                      position: 'top',
+                      labels: {
+                        color: '#F9FAFB',
+                        generateLabels: function(chart) {
+                          return [
+                            {
+                              text: 'وارد',
+                              fillStyle: 'rgba(34, 197, 94, 0.8)',
+                              strokeStyle: 'rgba(22, 163, 74, 1)',
+                              lineWidth: 2,
+                              hidden: false,
+                              index: 0
+                            },
+                            {
+                              text: 'صادر',
+                              fillStyle: 'rgba(239, 68, 68, 0.8)',
+                              strokeStyle: 'rgba(220, 38, 38, 1)',
+                              lineWidth: 2,
+                              hidden: false,
+                              index: 1
+                            }
+                          ];
+                        }
+                      }
                     },
                     tooltip: {
                       backgroundColor: "#1F2937",
@@ -193,10 +203,16 @@ export default function DashboardPage() {
                       borderWidth: 2,
                       padding: 12,
                       cornerRadius: 12,
-                      displayColors: false,
+                      displayColors: true,
                       callbacks: {
                         label: function(context) {
-                          return `Quantity: ${context.parsed.y}`;
+                          const movement = data.recentMovements[context.dataIndex];
+                          return [
+                            `النوع: ${movement.type === 'in' ? 'وارد' : 'صادر'}`,
+                            `الكمية: ${movement.quantity}`,
+                            `السعر: ${fmtMoney(movement.price, currency)}`,
+                            `الإجمالي: ${fmtMoney(movement.total, currency)}`
+                          ];
                         }
                       }
                     }
@@ -233,29 +249,7 @@ export default function DashboardPage() {
             </div>
           )}
         </Card>
-        <Card className="p-6 bg-gradient-to-br from-[#0f0f23] to-[#1a1a2e] border border-slate-700/50 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-          <h2 className="font-bold text-lg text-white mb-4">آخر الحركات</h2>
-          <div className="space-y-3 max-h-[260px] overflow-y-auto">
-            {data.recentMovements.length === 0 ? (
-              <div className="text-sm text-slate-400 py-12 text-center">لا توجد حركات</div>
-            ) : (
-              data.recentMovements.map((m) => (
-                <div key={m.id} className="flex items-center justify-between gap-3 text-sm">
-                  <div className="min-w-0">
-                    <div className="font-semibold truncate text-white">{m.productName}</div>
-                    <div className="text-xs text-slate-400">{fmtDate(m.createdAt)}</div>
-                  </div>
-                  <Badge
-                    variant={m.type === "in" ? "default" : "destructive"}
-                    className={m.type === "in" ? "bg-emerald-500/20 text-emerald-400" : ""}
-                  >
-                    {m.type === "in" ? `+${m.quantity}` : `-${m.quantity}`}
-                  </Badge>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
+       
       </div>
 
       <div className="bg-[#16162b] rounded-xl border border-slate-700/50 p-5">
@@ -280,7 +274,7 @@ export default function DashboardPage() {
               ) : (
                 data.recentMovements.map((m) => (
                   <tr key={m.id} className="border-t border-slate-700/50">
-                    <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(m.createdAt)}</td>
+                    <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(m.created_at)}</td>
                     <td className="px-4 py-3">
                       <span className={
                         m.type === "in"
@@ -290,7 +284,7 @@ export default function DashboardPage() {
                         {m.type === "in" ? "وارد" : "صادر"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-white">{m.productName}</td>
+                    <td className="px-4 py-3 text-white">{m.product_name}</td>
                     <td className="px-4 py-3 text-slate-400">{m.quantity}</td>
                     <td className="px-4 py-3 text-slate-400">{fmtMoney(m.price, currency)}</td>
                     <td className="px-4 py-3 text-white font-mono font-bold">{fmtMoney(m.total, currency)}</td>

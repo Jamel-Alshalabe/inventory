@@ -21,41 +21,42 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 });
 
-function PermissionGuard({ 
-  children, 
-  permissions, 
-  requireAny = true 
-}: { 
-  children: React.ReactNode; 
-  permissions: string[]; 
-  requireAny?: boolean; // true = any permission, false = all permissions
-}) {
-  const { user } = useApp();
-  
-  if (!user?.permissions || user.permissions.length === 0) {
-    return (
-      <div className="text-center py-20 text-muted-foreground">
-        ليس لديك صلاحية للوصول لهذه الصفحة
-      </div>
-    );
-  }
-  
-  const hasPermission = requireAny
-    ? permissions.some(permission => user.permissions.includes(permission))
-    : permissions.every(permission => user.permissions.includes(permission));
-    
-  if (!hasPermission) {
-    return (
-      <div className="text-center py-20 text-muted-foreground">
-        ليس لديك صلاحية للوصول لهذه الصفحة
-      </div>
-    );
-  }
-  
-  return <>{children}</>;
-}
-
 function Routes() {
+  const { user } = useApp();
+
+  function PermissionGuard({ 
+    children, 
+    permissions, 
+    requireAny = true 
+  }: { 
+    children: React.ReactNode; 
+    permissions: string[]; 
+    requireAny?: boolean; // true = any permission, false = all permissions
+  }) {
+    console.log(permissions);
+    if (!user?.permissions || user.permissions.length === 0) {
+      return (
+        <div className="text-center py-20 text-muted-foreground">
+          ليس لديك صلاحية للوصول لهذه الصفحة
+        </div>
+      );
+    }
+    
+    const hasPermission = requireAny
+      ? permissions.some(permission => user.permissions.includes(permission))
+      : permissions.every(permission => user.permissions.includes(permission));
+      
+    if (!hasPermission) {
+      return (
+        <div className="text-center py-20 text-muted-foreground">
+          ليس لديك صلاحية للوصول لهذه الصفحة
+        </div>
+      );
+    }
+    
+    return <>{children}</>;
+  }
+
   return (
     <Switch>
       <Route path="/" component={DashboardPage} />
@@ -66,7 +67,7 @@ function Routes() {
       <Route path="/reports" component={ReportsPage} />
       <Route path="/warehouses">
         {() => (
-          <PermissionGuard permissions={["manage-warehouses"]}>
+          <PermissionGuard permissions={["view-warehouses"]}>
             <WarehousesPage />
           </PermissionGuard>
         )}
@@ -79,10 +80,7 @@ function Routes() {
         )}
       </Route>
       <Route path="/subscriptions">
-        {() => {
-          const { user } = useApp();
-          return user?.role === 'super_admin' ? <SubscriptionsPage /> : <NotFound />;
-        }}
+        {() => (user?.role === 'super_admin' ? <SubscriptionsPage /> : <NotFound />)}
       </Route>
       <Route path="/settings">
         {() => (
