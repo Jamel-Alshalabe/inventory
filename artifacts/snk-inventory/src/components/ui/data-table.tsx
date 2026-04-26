@@ -80,9 +80,9 @@ export function DataTable<TData, TValue>({
   return (
     <div className={cn("space-y-4", className)}>
       {/* Search and Actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2 space-x-reverse">
-          <div className="relative">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center space-x-2 space-x-reverse w-full sm:w-auto">
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground size-4" />
             <Input
               placeholder={searchPlaceholder}
@@ -90,7 +90,7 @@ export function DataTable<TData, TValue>({
               onChange={(event) =>
                 table.getColumn(searchKey)?.setFilterValue(event.target.value)
               }
-              className="pl-10 pr-10 w-64"
+              className="pl-10 pr-10 w-full sm:w-64"
             />
           </div>
         </div>
@@ -98,8 +98,10 @@ export function DataTable<TData, TValue>({
         {/* Column Visibility Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              الأعمدة <ChevronDown className="mr-2 h-4 w-4" />
+            <Button variant="outline" className="ml-auto text-sm">
+              <span className="hidden sm:inline">الأعمدة</span>
+              <span className="sm:hidden">أعمدة</span>
+              <ChevronDown className="mr-1 sm:mr-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -127,21 +129,24 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Table */}
-      <div className="rounded-md border border-border bg-card">
-        <Table>
+      <div className="rounded-md border border-border bg-card overflow-x-auto">
+        <Table className="min-w-[600px]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-right font-medium">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  const metaClassName = (header.column.columnDef.meta as any)?.className || "";
+                  return (
+                    <TableHead key={header.id} className={`text-right font-medium ${metaClassName}`}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>
@@ -153,14 +158,17 @@ export function DataTable<TData, TValue>({
                   data-state={row.getIsSelected() && "selected"}
                   className="hover:bg-muted/50"
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="text-right">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const metaClassName = (cell.column.columnDef.meta as any)?.className || "";
+                    return (
+                      <TableCell key={cell.id} className={`text-right ${metaClassName}`}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))
             ) : (
@@ -178,17 +186,19 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between space-x-2 py-4">
-        <div className="text-sm text-muted-foreground">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-4">
+        <div className="text-xs sm:text-sm text-muted-foreground order-2 sm:order-1">
           {table.getFilteredSelectedRowModel().rows.length} من{" "}
-          {table.getFilteredRowModel().rows.length} صف مختار.
+          {table.getFilteredRowModel().rows.length} صف
+          <span className="hidden sm:inline"> مختار</span>
         </div>
-        <div className="flex items-center space-x-2 space-x-reverse">
+        <div className="flex items-center gap-2 order-1 sm:order-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
+            className="text-sm"
           >
             السابق
           </Button>
@@ -197,6 +207,7 @@ export function DataTable<TData, TValue>({
             size="sm"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
+            className="text-sm"
           >
             التالي
           </Button>

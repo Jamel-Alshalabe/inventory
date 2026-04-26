@@ -178,6 +178,24 @@ const getLogs = async (limit: number = 50) => {
   });
 };
 
+// Add bulk import products function
+const bulkImportProducts = async (data: {
+  items: Array<{
+    code: string;
+    name: string;
+    buyPrice: number;
+    sellPrice: number;
+    quantity: number;
+  }>;
+  warehouseId?: number;
+}) => {
+  return customFetch<{ created: number; updated: number }>('/api/products/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+};
+
 export const api = {
   ...generatedApi,
   updateUser,
@@ -186,5 +204,6 @@ export const api = {
   getSettings,
   updateSettings,
   getLogs,
+  bulkImportProducts,
 };
 

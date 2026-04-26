@@ -39,36 +39,38 @@ function getStockMovementColumns(
 ): ColumnDef<Movement>[] {
   return [
     {
-      accessorKey: "type",
-      header: "النوع",
-      cell: ({ row }) => {
-        const type = row.getValue("type") as "in" | "out";
-        return (
-          <Badge
-            className={
-              type === "in"
-                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                : "bg-orange-100 text-orange-800 border-orange-200"
-            }
-          >
-            {type === "in" ? "وارد" : "صادر"}
-          </Badge>
-        );
-      },
+      accessorKey: "productName",
+      header: "المنتج",
+      cell: ({ row }) => (
+        <div className="font-semibold truncate max-w-[100px] sm:max-w-[200px]" title={row.getValue("productName")}>{row.getValue("productName")}</div>
+      ),
     },
     {
       accessorKey: "productCode",
       header: "الكود",
+      meta: { className: "hidden md:table-cell" },
       cell: ({ row }) => (
         <div className="font-mono text-xs">{row.getValue("productCode")}</div>
       ),
     },
     {
-      accessorKey: "productName",
-      header: "المنتج",
-      cell: ({ row }) => (
-        <div className="font-semibold">{row.getValue("productName")}</div>
-      ),
+      accessorKey: "type",
+      header: "النوع",
+      meta: { className: "hidden sm:table-cell" },
+      cell: ({ row }) => {
+        const type = row.getValue("type") as "in" | "out";
+        return (
+          <Badge
+            className={`text-xs sm:text-sm ${
+              type === "in"
+                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                : "bg-orange-100 text-orange-800 border-orange-200"
+            }`}
+          >
+            {type === "in" ? "وارد" : "صادر"}
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: "quantity",
@@ -78,11 +80,11 @@ function getStockMovementColumns(
         const type = row.getValue("type") as "in" | "out";
         return (
           <Badge
-            className={
+            className={`text-xs sm:text-sm ${
               type === "in"
                 ? "bg-accent text-accent-foreground"
                 : "bg-destructive text-destructive-foreground"
-            }
+            }`}
           >
             {type === "in" ? "+" : "-"}
             {quantity}
@@ -93,22 +95,25 @@ function getStockMovementColumns(
     {
       accessorKey: "price",
       header: "السعر",
+      meta: { className: "hidden sm:table-cell" },
       cell: ({ row }) => {
         const price = parseFloat(row.getValue("price"));
-        return <div>{fmtMoney(price, currency)}</div>;
+        return <div className="text-xs sm:text-sm">{fmtMoney(price, currency)}</div>;
       },
     },
     {
       accessorKey: "total",
       header: "الإجمالي",
+      meta: { className: "hidden sm:table-cell" },
       cell: ({ row }) => {
         const total = parseFloat(row.getValue("total"));
-        return <div className="font-semibold">{fmtMoney(total, currency)}</div>;
+        return <div className="font-semibold text-xs sm:text-sm">{fmtMoney(total, currency)}</div>;
       },
     },
     {
       accessorKey: "createdAt",
       header: "التاريخ",
+      meta: { className: "hidden lg:table-cell" },
       cell: ({ row }) => (
         <div className="text-muted-foreground text-xs">{fmtDate(row.getValue("createdAt"))}</div>
       ),
@@ -126,6 +131,7 @@ function getStockMovementColumns(
           <Button
             size="icon"
             variant="ghost"
+            className="size-8 sm:size-9"
             onClick={() => {
               confirm({
                 title: "حذف الحركة",
@@ -135,7 +141,7 @@ function getStockMovementColumns(
             }}
             data-testid={`button-delete-${movement.id}`}
           >
-            <Trash2 className="size-4 text-destructive" />
+            <Trash2 className="size-3.5 sm:size-4" />
           </Button>
         );
       },
@@ -535,11 +541,12 @@ export default function StockMovementsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">حركة المخزون</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {filteredMovements.length} حركة • وارد {inQty} • صادر {outQty} • {fmtMoney(totalValue, currency)}
+          <h1 className="text-xl sm:text-2xl font-bold">حركة المخزون</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm mt-1">
+            {filteredMovements.length} حركة • وارد {inQty} • صادر {outQty}
+            <span className="hidden sm:inline"> • {fmtMoney(totalValue, currency)}</span>
           </p>
         </div>
         
@@ -559,16 +566,13 @@ export default function StockMovementsPage() {
             </Select>
           </div>
           
-          {/* Print Button */}
-          <Button variant="outline" onClick={printStockMovements}>
-            <Printer className="size-4 ml-2" />
-            طباعة التقرير
-          </Button>
+         
           
           {canEdit && (
-            <Button onClick={openAddMovement}>
-              <Plus className="size-4 ml-2" />
-              إضافة حركة
+            <Button onClick={openAddMovement} className="text-sm">
+              <Plus className="size-4 ml-1 sm:ml-2" />
+              <span className="hidden sm:inline">إضافة حركة</span>
+              <span className="sm:hidden">إضافة</span>
             </Button>
           )}
         </div>
@@ -662,7 +666,7 @@ export default function StockMovementsPage() {
         </Dialog>
       )}
 
-      <Card className="p-5">
+      <Card className="p-3 sm:p-5">
         {movementsLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-2">

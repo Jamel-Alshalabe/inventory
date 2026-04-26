@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, type Movement } from "@/lib/api";
+import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Printer, FileSpreadsheet, FileText, Zap, Calendar, Layers, Clock, CalendarDays } from "lucide-react";
+import { useApp, warehouseQuery } from "@/lib/app-context";
 
 interface ReportData {
   id: number;
@@ -27,46 +29,131 @@ interface ReportData {
   total: number;
 }
 
+// Print styles - defined outside component to avoid hooks order issues
+const printStyles = `
+  @media print {
+    body {
+      background: white !important;
+      color: black !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-only-section {
+      display: block !important;
+      padding: 20px;
+    }
+    .print-only-section * {
+      color: black !important;
+    }
+    .print-only-section .bg-gradient-to-r {
+      background: #1e40af !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-only-section .bg-red-500 {
+      background-color: #ef4444 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-only-section .bg-blue-500 {
+      background-color: #3b82f6 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-only-section .bg-orange-500 {
+      background-color: #f97316 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-only-section .bg-green-500 {
+      background-color: #22c55e !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-only-section .bg-orange-500 span,
+    .print-only-section .bg-green-500 span {
+      color: white !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-only-section table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .print-only-section th,
+    .print-only-section td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: right;
+    }
+    .print-only-section th {
+      background: #1e40af !important;
+      color: white !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-only-section tr:nth-child(even) {
+      background-color: #eff6ff !important;
+    }
+  }
+`;
+
 export default function ReportsPage() {
   const { toast } = useToast();
+  const { selectedWarehouseId } = useApp();
   const [quickReportOpen, setQuickReportOpen] = useState(false);
+  const [productReportOpen, setProductReportOpen] = useState(false);
   const [printOptionsOpen, setPrintOptionsOpen] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [filteredData, setFilteredData] = useState<ReportData[]>([]);
 
-  // Mock data for demonstration
-  const mockData: ReportData[] = [
-    { id: 1, date: "2026-04-22", type: "صادر", product: "راس سايفون", quantity: 5, price: 15000, total: 75000 },
-    { id: 2, date: "2026-04-21", type: "وارد", product: "قفيص", quantity: 10, price: 8000, total: 80000 },
-    { id: 3, date: "2026-04-20", type: "صادر", product: "كدوسات", quantity: 3, price: 25000, total: 75000 },
-    { id: 4, date: "2026-04-19", type: "وارد", product: "فانوس كبير 2008", quantity: 2, price: 35000, total: 70000 },
-    { id: 5, date: "2026-04-18", type: "صادر", product: "سايفون", quantity: 8, price: 12000, total: 96000 },
-    { id: 6, date: "2026-04-17", type: "وارد", product: "ترس بنيون امامي", quantity: 15, price: 5000, total: 75000 },
-    { id: 7, date: "2026-04-16", type: "صادر", product: "عفريتة 10 طن", quantity: 1, price: 100000, total: 100000 },
-    { id: 8, date: "2026-04-10", type: "وارد", product: "محرك سيارة", quantity: 2, price: 45000, total: 90000 },
-    { id: 9, date: "2026-04-05", type: "صادر", product: "إطارات", quantity: 4, price: 8000, total: 32000 },
-    { id: 10, date: "2026-03-28", type: "وارد", product: "زيت محركات", quantity: 10, price: 1500, total: 15000 },
-    { id: 11, date: "2026-03-25", type: "صادر", product: "بطاريات", quantity: 3, price: 12000, total: 36000 },
-    { id: 12, date: "2026-03-20", type: "وارد", product: "فلتر هواء", quantity: 20, price: 500, total: 10000 },
-    { id: 13, date: "2026-03-15", type: "صادر", product: "شموع احتراق", quantity: 8, price: 2000, total: 16000 },
-    { id: 14, date: "2026-02-28", type: "وارد", product: "سوائل فرامل", quantity: 15, price: 3000, total: 45000 },
-    { id: 15, date: "2026-02-20", type: "صادر", product: "أضواء أمامية", quantity: 5, price: 6000, total: 30000 },
-    { id: 16, date: "2026-02-15", type: "وارد", product: "مرايا جانبية", quantity: 8, price: 2500, total: 20000 },
-    { id: 17, date: "2026-01-30", type: "صادر", product: "كفرات", quantity: 10, price: 4000, total: 40000 },
-    { id: 18, date: "2026-01-20", type: "وارد", product: "مكابس", quantity: 6, price: 8000, total: 48000 },
-    { id: 19, date: "2025-12-25", type: "صادر", product: "سلك كهرباء", quantity: 50, price: 100, total: 5000 },
-    { id: 20, date: "2025-12-15", type: "وارد", product: "مفتاح راديو", quantity: 12, price: 1500, total: 18000 },
-  ];
+  // Fetch movements from API
+  const { data: movementsResponse = [], isLoading } = useQuery({
+    queryKey: ["movements", selectedWarehouseId],
+    queryFn: () => customFetch<Movement[]>(`/api/movements${warehouseQuery(selectedWarehouseId)}`),
+  });
+
+  // Extract movements array from response
+  const movements = Array.isArray(movementsResponse) ? movementsResponse : (Array.isArray((movementsResponse as any)?.data) ? (movementsResponse as any)?.data : []);
+
+  // Convert movements to report data
+  const convertToReportData = (movements: Movement[]): ReportData[] => {
+    return movements.map(movement => ({
+      id: movement.id,
+      date: movement.createdAt.split('T')[0],
+      type: movement.type === 'out' ? 'صادر' : 'وارد',
+      product: movement.productName,
+      quantity: movement.quantity,
+      price: movement.price,
+      total: movement.total,
+    }));
+  };
 
   // Initialize filtered data with all data
   useEffect(() => {
-    setFilteredData(mockData);
+    setFilteredData(convertToReportData(movements));
+  }, [movements]);
+
+  // Inject print styles
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = printStyles;
+    styleElement.id = 'reports-print-styles';
+    document.head.appendChild(styleElement);
+    
+    return () => {
+      const existingStyle = document.getElementById('reports-print-styles');
+      if (existingStyle) {
+        document.head.removeChild(existingStyle);
+      }
+    };
   }, []);
 
   // Filtering functions
   const filterByDateRange = (start: string, end: string) => {
-    const filtered = mockData.filter(item => {
+    const reportData = convertToReportData(movements);
+    const filtered = reportData.filter((item: ReportData) => {
       const itemDate = new Date(item.date);
       const startDate = new Date(start);
       const endDate = new Date(end);
@@ -102,7 +189,7 @@ export default function ReportsPage() {
   const showAllData = () => {
     setStartDate("");
     setEndDate("");
-    setFilteredData(mockData);
+    setFilteredData(convertToReportData(movements));
   };
 
   // Calculate summary data based on filtered data
@@ -131,13 +218,48 @@ export default function ReportsPage() {
   };
 
   const handleExportCSV = () => {
-    // Placeholder for CSV export
-    toast({ title: "جاري تصدير ملف CSV..." });
+    // Format date in Arabic
+    const formatDateForExport = (dateString: string) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('ar-SA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(date);
+    };
+
+    const headers = ['التاريخ', 'النوع', 'المنتج', 'الكمية', 'السعر', 'الإجمالي'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredData.map(item =>
+        [
+          formatDateForExport(item.date),
+          item.type,
+          item.product,
+          item.quantity,
+          item.price,
+          item.total
+        ].join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `تقرير_${startDate}_${endDate}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({ title: "تم تصدير ملف Excel بنجاح" });
   };
 
   const handleExportPDF = () => {
-    // Placeholder for PDF export
-    toast({ title: "جاري تصدير ملف PDF..." });
+    // For PDF export, we'll use window.print() with print CSS
+    window.print();
+    toast({ title: "جاري طباعة التقرير..." });
   };
 
   const handleQuickReport = () => {
@@ -152,236 +274,342 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">التقارير</h1>
-          <p className="text-muted-foreground text-sm mt-1">نظرة عامة على حركة المخزون</p>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-1">التقارير</h1>
+        <p className="text-gray-400 text-sm">نظرة عامة على حركة المخزون</p>
+      </div>
+
+      {/* All Buttons in One Container */}
+      <div className="flex flex-wrap gap-2">
+        {/* Filter Buttons */}
+        <Button 
+          onClick={filterLastWeek} 
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition"
+        >
+          <Clock className="size-4 ml-2" />
+          آخر أسبوع
+        </Button>
+        <Button 
+          onClick={filterLastMonth} 
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition"
+        >
+          <CalendarDays className="size-4 ml-2" />
+          آخر شهر
+        </Button>
+        <Button 
+          onClick={filterLastYear} 
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition"
+        >
+          <Clock className="size-4 ml-2" />
+          آخر سنة
+        </Button>
+        <Button 
+          onClick={showAllData} 
+          className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition"
+        >
+          <Calendar className="size-4 ml-2" />
+          الكل
+        </Button>
+        
+        {/* Report Type & Export Buttons */}
+        <Button 
+          onClick={() => setQuickReportOpen(true)} 
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
+        >
+          <Zap className="size-4 ml-2" />
+          تقرير سريع
+        </Button>
+        <Button 
+          onClick={() => setProductReportOpen(true)} 
+          className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
+        >
+          <Layers className="size-4 ml-2" />
+          تقرير منتج
+        </Button>
+        <Button 
+          onClick={handleExportPDF} 
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
+        >
+          <FileText className="size-4 ml-2" />
+          PDF
+        </Button>
+        <Button 
+          onClick={handleExportCSV} 
+          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
+        >
+          <FileSpreadsheet className="size-4 ml-2" />
+          Excel
+        </Button>
+      </div>
+
+      {/* Date Range Filter */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="space-y-1">
+          <Label className="text-xs text-gray-400">من</Label>
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              if (endDate) {
+                filterByDateRange(e.target.value, endDate);
+              }
+            }}
+            className="bg-gray-800 border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none w-40"
+          />
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setQuickReportOpen(true)}>
-            <Zap className="size-4 ml-2" />
-            تقرير سريع
-          </Button>
-          <Button onClick={handlePrint}>
-            <Printer className="size-4 ml-2" />
-            طباعة التقرير
-          </Button>
+        <div className="space-y-1">
+          <Label className="text-xs text-gray-400">إلى</Label>
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              if (startDate) {
+                filterByDateRange(startDate, e.target.value);
+              }
+            }}
+            className="bg-gray-800 border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none w-40"
+          />
+        </div>
+        <Button 
+          onClick={() => { if (startDate && endDate) filterByDateRange(startDate, endDate); }} 
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition h-10"
+        >
+          عرض
+        </Button>
+      </div>
+
+      {/* Summary Cards - Dark Theme */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <p className="text-gray-400 text-sm mb-1">إجمالي الوارد</p>
+          <p className="text-2xl font-bold text-green-400 font-mono">
+            Fr {totalImport.toLocaleString('ar-EG')}
+          </p>
+        </div>
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <p className="text-gray-400 text-sm mb-1">إجمالي الصادر</p>
+          <p className="text-2xl font-bold text-amber-400 font-mono">
+            Fr {totalExport.toLocaleString('ar-EG')}
+          </p>
+        </div>
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <p className="text-gray-400 text-sm mb-1">الكمية المتبقية</p>
+          <p className="text-2xl font-bold text-white font-mono">
+            {remainingQuantity.toLocaleString('ar-EG')}
+          </p>
+        </div>
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <p className="text-gray-400 text-sm mb-1">الربح / الخسارة</p>
+          <p className={`text-2xl font-bold font-mono ${profitLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            Fr {profitLoss.toLocaleString('ar-EG')}{profitLoss < 0 ? '-' : ''}
+          </p>
         </div>
       </div>
 
-      {/* Report Buttons Section - Updated */}
-      <Card className="p-4 border-2 border-blue-200">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Export Buttons */}
-          <Button onClick={handleExportCSV} variant="outline" size="sm">
-            <FileSpreadsheet className="size-4 ml-2" />
-            Excel
-          </Button>
-          <Button onClick={handleExportPDF} variant="outline" size="sm">
-            <FileText className="size-4 ml-2" />
-            PDF
-          </Button>
-          
-          {/* Report Type Buttons */}
-          <Button variant="outline" size="sm">
-            <Layers className="size-4 ml-2" />
-            تقسيم منتج
-          </Button>
-          <Button variant="outline" size="sm">
-            <Zap className="size-4 ml-2" />
-            تقسيم سريع
-          </Button>
-          <Button onClick={showAllData} variant="outline" size="sm">
-            <Calendar className="size-4 ml-2" />
-            الكل
-          </Button>
-          <Button onClick={filterLastWeek} variant="outline" size="sm">
-            <Clock className="size-4 ml-2" />
-            آخر أسبوع
-          </Button>
-          <Button onClick={filterLastMonth} variant="outline" size="sm">
-            <CalendarDays className="size-4 ml-2" />
-            آخر شهر
-          </Button>
-          <Button onClick={filterLastYear} variant="outline" size="sm">
-            <Clock className="size-4 ml-2" />
-            آخر سنة
-          </Button>
-          
-          {/* Date Range */}
-          <div className="flex items-center gap-2 border-r pr-3 mr-2">
-            <Label className="text-sm whitespace-nowrap">من</Label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                if (endDate) {
-                  filterByDateRange(e.target.value, endDate);
-                }
-              }}
-              className="w-32 h-8 text-xs"
-            />
-            <Label className="text-sm whitespace-nowrap">إلى</Label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                if (startDate) {
-                  filterByDateRange(startDate, e.target.value);
-                }
-              }}
-              className="w-32 h-8 text-xs"
-            />
+      {/* Data Table - Dark Theme */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-gray-400">جاري تحميل البيانات...</div>
+          </div>
+        ) : filteredData.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            لا توجد بيانات للعرض
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-gray-800 text-gray-300">
+                <TableRow>
+                  <TableHead className="text-right px-4 py-3 bg-gray-800">التاريخ</TableHead>
+                  <TableHead className="text-right px-4 py-3 bg-gray-800">النوع</TableHead>
+                  <TableHead className="text-right px-4 py-3 bg-gray-800">المنتج</TableHead>
+                  <TableHead className="text-right px-4 py-3 bg-gray-800">الكمية</TableHead>
+                  <TableHead className="text-right px-4 py-3 bg-gray-800">السعر</TableHead>
+                  <TableHead className="text-right px-4 py-3 bg-gray-800">الإجمالي</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredData.map((item) => (
+                  <TableRow key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                    <TableCell className="text-right px-4 py-3 text-gray-300">{item.date}</TableCell>
+                    <TableCell className="text-right px-4 py-3">
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-semibold ${
+                          item.type === "صادر" 
+                            ? "bg-red-600 text-white" 
+                            : "bg-blue-600 text-white"
+                        }`}
+                      >
+                        {item.type}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right px-4 py-3 font-medium text-gray-300">{item.product}</TableCell>
+                    <TableCell className="text-right px-4 py-3 text-gray-300">{item.quantity}</TableCell>
+                    <TableCell className="text-right px-4 py-3 text-gray-300">Fr {item.price.toLocaleString('ar-EG')}</TableCell>
+                    <TableCell className="text-right px-4 py-3 font-semibold text-gray-300">
+                      Fr {item.total.toLocaleString('ar-EG')}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {/* Print Button */}
+      <div className="flex justify-center print:hidden">
+        <Button 
+          onClick={handlePrint} 
+          className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-3 rounded-lg text-sm flex items-center gap-2 transition"
+        >
+          <Printer className="size-4 ml-2" />
+          طباعة التقرير
+        </Button>
+      </div>
+
+      {/* Print-Only Section - Styled for printing */}
+      <div className="hidden print:block print-only-section">
+        {/* Print Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 text-center mb-6">
+          <h2 className="text-3xl font-bold mb-2">📊 تقرير حركة المخزون</h2>
+          <p className="text-sm opacity-90 mb-1">شركة منصة قطع غيار السيارات</p>
+          <p className="text-sm opacity-90">الفترة من {startDate || 'كل الفترة'} إلى {endDate || 'كل الفترة'}</p>
+        </div>
+
+        {/* Print Summary Cards */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="bg-red-500 text-white p-4 rounded-lg text-center">
+            <p className="text-sm mb-1">💰 الربح/الخسارة</p>
+            <p className="text-2xl font-bold">{profitLoss.toLocaleString('ar-EG')}</p>
+            <p className="text-sm">Fr</p>
+          </div>
+          <div className="bg-blue-500 text-white p-4 rounded-lg text-center">
+            <p className="text-sm mb-1">📦 المتبقي</p>
+            <p className="text-2xl font-bold">{remainingQuantity.toLocaleString('ar-EG')}</p>
+            <p className="text-sm">وحدة</p>
+          </div>
+          <div className="bg-orange-500 text-white p-4 rounded-lg text-center">
+            <p className="text-sm mb-1">📤 إجمالي الصادر</p>
+            <p className="text-2xl font-bold">{totalExport.toLocaleString('ar-EG')}</p>
+            <p className="text-sm">Fr</p>
+          </div>
+          <div className="bg-green-500 text-white p-4 rounded-lg text-center">
+            <p className="text-sm mb-1">📥 إجمالي الوارد</p>
+            <p className="text-2xl font-bold">{totalImport.toLocaleString('ar-EG')}</p>
+            <p className="text-sm">Fr</p>
           </div>
         </div>
-      </Card>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card dir="rtl">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              الربح / الخسارة
-            </CardTitle>
-          </CardHeader>
-          <CardContent dir="rtl">
-            <div className={`text-2xl font-bold ${profitLoss >= 0 ? 'text-green-600' : 'text-destructive'}`}>
-              Fr {profitLoss.toLocaleString('ar-EG')}{profitLoss < 0 ? '-' : ''}
-            </div>
-          </CardContent>
-        </Card>
-        <Card dir="rtl">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              الكمية المتبقية
-            </CardTitle>
-          </CardHeader>
-          <CardContent dir="rtl">
-            <div className="text-2xl font-bold">
-              {remainingQuantity.toLocaleString('ar-EG')}
-            </div>
-          </CardContent>
-        </Card>
-        <Card dir="rtl">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              إجمالي الصادر
-            </CardTitle>
-          </CardHeader>
-          <CardContent dir="rtl">
-            <div className="text-2xl font-bold">
-              Fr {totalExport.toLocaleString('ar-EG')}
-            </div>
-          </CardContent>
-        </Card>
-        <Card dir="rtl">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              إجمالي الوارد
-            </CardTitle>
-          </CardHeader>
-          <CardContent dir="rtl">
-            <div className="text-2xl font-bold">
-              Fr {totalImport.toLocaleString('ar-EG')}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Print Data Table */}
+        <table className="w-full text-sm border-collapse border border-gray-300">
+          <thead className="bg-gradient-to-r from-blue-600 to-blue-800 text-white">
+            <tr>
+              <th className="px-4 py-3 text-right border border-gray-300">التاريخ</th>
+              <th className="px-4 py-3 text-right border border-gray-300">النوع</th>
+              <th className="px-4 py-3 text-right border border-gray-300">المنتج</th>
+              <th className="px-4 py-3 text-right border border-gray-300">الكمية</th>
+              <th className="px-4 py-3 text-right border border-gray-300">السعر</th>
+              <th className="px-4 py-3 text-right border border-gray-300">الإجمالي</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredData.map((item, index) => (
+              <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                <td className="px-4 py-3 text-right border border-gray-300">{item.date}</td>
+                <td className="px-4 py-3 text-right border border-gray-300">
+                  <span 
+                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                      item.type === "صادر" 
+                        ? "bg-orange-500 text-white" 
+                        : "bg-green-500 text-white"
+                    }`}
+                  >
+                    {item.type}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right border border-gray-300 font-medium">{item.product}</td>
+                <td className="px-4 py-3 text-right border border-gray-300">{item.quantity}</td>
+                <td className="px-4 py-3 text-right border border-gray-300">{item.price.toLocaleString('ar-EG')}</td>
+                <td className="px-4 py-3 text-right border border-gray-300 font-semibold">{item.total.toLocaleString('ar-EG')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {/* Data Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>تفاصيل الحركات</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-right">التاريخ</TableHead>
-                <TableHead className="text-right">النوع</TableHead>
-                <TableHead className="text-right">المنتج</TableHead>
-                <TableHead className="text-right">الكمية</TableHead>
-                <TableHead className="text-right">السعر</TableHead>
-                <TableHead className="text-right">الإجمالي</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredData.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="text-right">{item.date}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge 
-                      variant={item.type === "صادر" ? "destructive" : "default"}
-                      className="font-semibold"
-                    >
-                      {item.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-medium">{item.product}</TableCell>
-                  <TableCell className="text-right">{item.quantity}</TableCell>
-                  <TableCell className="text-right">Fr {item.price.toLocaleString('ar-EG')}</TableCell>
-                  <TableCell className="text-right font-semibold">
-                    Fr {item.total.toLocaleString('ar-EG')}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Quick Report Dialog */}
+      {/* Quick Report Dialog - Matching test.txt design */}
       <Dialog open={quickReportOpen} onOpenChange={setQuickReportOpen}>
-        <DialogContent dir="rtl" className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Zap className="size-5" />
-              التقرير السريع
+        <DialogContent dir="rtl" className="sm:max-w-md bg-gray-800 border-gray-700 text-white p-0 overflow-hidden">
+          <DialogHeader className="p-5 border-b border-gray-700">
+            <DialogTitle className="flex items-center justify-between text-white text-lg font-bold">
+              <span className="flex items-center gap-2">
+                <Zap className="size-5 text-yellow-400" />
+               التقرير السريع
+              </span>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="start-date">من</Label>
+
+          <div className="p-5 space-y-4">
+            {/* Date Range Filter */}
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="quick-report-from" className="text-sm text-gray-300 mb-1 block">من</Label>
                 <Input
-                  id="start-date"
+                  id="quick-report-from"
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="text-right"
+                  className="w-full bg-gray-900 border-gray-600 text-white rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="end-date">إلى</Label>
+              <div>
+                <Label htmlFor="quick-report-to" className="text-sm text-gray-300 mb-1 block">إلى</Label>
                 <Input
-                  id="end-date"
+                  id="quick-report-to"
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="text-right"
+                  className="w-full bg-gray-900 border-gray-600 text-white rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
               </div>
             </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-3 gap-2">
+              <Button 
+                onClick={() => { filterByDateRange(startDate || '', endDate || ''); handleExportPDF(); }} 
+                className="bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1"
+              >
+                <FileText className="w-4 h-4" /> PDF
+              </Button>
+              <Button 
+                onClick={() => { filterByDateRange(startDate || '', endDate || ''); handleExportCSV(); }} 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1"
+              >
+                <FileSpreadsheet className="w-4 h-4" /> CSV
+              </Button>
+              <Button 
+                onClick={() => { filterByDateRange(startDate || '', endDate || ''); handleQuickReport(); }} 
+                className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1"
+              >
+                <Printer className="w-4 h-4" /> طباعة
+              </Button>
+            </div>
+
+            {/* Close Button */}
+            <Button 
+              onClick={() => setQuickReportOpen(false)} 
+              variant="outline"
+              className="w-full bg-gray-700 hover:bg-gray-600 text-white border-gray-600 py-2 rounded-lg text-sm font-medium transition"
+            >
+              إغلاق
+            </Button>
           </div>
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => setQuickReportOpen(false)}>
-              إلغاء
-            </Button>
-            <Button onClick={handleExportCSV} variant="outline">
-              <FileSpreadsheet className="size-4 ml-2" />
-              CSV
-            </Button>
-            <Button onClick={handleExportPDF} variant="outline">
-              <FileText className="size-4 ml-2" />
-              PDF
-            </Button>
-            <Button onClick={handleQuickReport}>
-              <Printer className="size-4 ml-2" />
-              طباعة
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -410,6 +638,113 @@ export default function ReportsPage() {
               إلغاء
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Report Dialog - Matching test.txt design */}
+      <Dialog open={productReportOpen} onOpenChange={setProductReportOpen}>
+        <DialogContent dir="rtl" className="sm:max-w-2xl max-h-[90vh] bg-gray-800 border-gray-700 text-white p-0 overflow-hidden">
+          <DialogHeader className="p-5 border-b border-gray-700 sticky top-0 z-10 bg-gray-800">
+            <DialogTitle className="flex items-center justify-between text-white text-lg font-bold">
+              <span className="flex items-center gap-2">
+                <Layers className="size-5 text-amber-400" />
+                 تقرير المنتج
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="p-5 space-y-4">
+            {/* Product Selection */}
+            <div className="space-y-1">
+              <Label htmlFor="prod-report-select" className="text-sm text-gray-300">اختر المنتج</Label>
+              <select
+                id="prod-report-select"
+                className="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                onChange={(e) => {
+                  const selectedProduct = e.target.value;
+                  if (selectedProduct) {
+                    const productMovements = filteredData.filter(item => item.product === selectedProduct);
+                    // Show product-specific data
+                  }
+                }}
+              >
+                <option value="">اختر منتجاً...</option>
+                {[...new Set(filteredData.map(item => item.product))].map(product => (
+                  <option key={product} value={product}>{product}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date Range */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="prod-report-from" className="text-sm text-gray-300 mb-1 block">من</Label>
+                <Input
+                  id="prod-report-from"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <Label htmlFor="prod-report-to" className="text-sm text-gray-300 mb-1 block">إلى</Label>
+                <Input
+                  id="prod-report-to"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Preview Section */}
+            <div className="bg-gray-900 rounded-lg p-4 max-h-60 overflow-y-auto">
+              <h4 className="text-white font-semibold mb-3 text-sm">معاينة البيانات</h4>
+              <div className="space-y-2 text-xs">
+                {filteredData.slice(0, 5).map((item) => (
+                  <div key={item.id} className="flex justify-between items-center py-1 border-b border-gray-700">
+                    <span className="text-gray-300">{item.date} - {item.product}</span>
+                    <span className={item.type === "وارد" ? "text-green-400" : "text-red-400"}>
+                      {item.type}: {item.quantity}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => { filterByDateRange(startDate || '', endDate || ''); setProductReportOpen(false); }} 
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" /> عرض
+              </Button>
+              <Button 
+                onClick={() => { filterByDateRange(startDate || '', endDate || ''); handleExportPDF(); }} 
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
+              >
+                <FileText className="w-4 h-4" /> PDF
+              </Button>
+              <Button 
+                onClick={() => { filterByDateRange(startDate || '', endDate || ''); handleExportCSV(); }} 
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
+              >
+                <FileSpreadsheet className="w-4 h-4" /> CSV
+              </Button>
+            </div>
+
+            {/* Close Button */}
+            <Button 
+              onClick={() => setProductReportOpen(false)} 
+              variant="outline"
+              className="w-full bg-gray-700 hover:bg-gray-600 text-white border-gray-600 py-2 rounded-lg text-sm font-medium transition"
+            >
+              إغلاق
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

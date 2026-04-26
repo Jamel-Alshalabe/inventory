@@ -233,7 +233,8 @@ input,select,textarea{font-family:'Noto Kufi Arabic',sans-serif}
         </div>
         <p id="invoices-empty" class="text-dark-300 text-sm text-center py-8 hidden">لا توجد فواتير</p>
        </div>
-      </div><!-- Reports Page -->
+      </div>
+      <!-- Reports Page -->
       <div id="page-reports" class="page hidden fade-in">
        <h2 class="text-2xl font-bold text-white mb-6">التقارير</h2>
        <div class="flex gap-2 mb-4 flex-wrap"><button onclick="genReport('week')" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm transition">آخر أسبوع</button> <button onclick="genReport('month')" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm transition">آخر شهر</button> <button onclick="genReport('year')" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm transition">آخر سنة</button> <button onclick="genReport('all')" class="bg-dark-600 hover:bg-dark-500 text-white px-4 py-2 rounded-lg text-sm transition">الكل</button> <button onclick="showQuickReportModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"><i data-lucide="zap" class="w-4 h-4"></i> تقرير سريع</button> <button onclick="showProductReportModal()" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"><i data-lucide="file-text" class="w-4 h-4"></i> تقرير منتج</button> <button onclick="exportReportPDF()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"><i data-lucide="file-pdf" class="w-4 h-4"></i> PDF</button> <button onclick="exportReportExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"><i data-lucide="table" class="w-4 h-4"></i> Excel</button>
@@ -281,7 +282,12 @@ input,select,textarea{font-family:'Noto Kufi Arabic',sans-serif}
          </div>
         </div><button onclick="printReport()" class="bg-dark-600 hover:bg-dark-500 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition"> <i data-lucide="printer" class="w-4 h-4"></i> طباعة التقرير </button>
        </div>
-      </div><!-- Warehouses Page (Admin) -->
+      </div>
+      
+      
+      
+      
+      <!-- Warehouses Page (Admin) -->
       <div id="page-warehouses" class="page hidden fade-in">
        <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
         <h2 class="text-2xl font-bold text-white">المخازن</h2><button onclick="showModal('warehouse-modal')" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition"> <i data-lucide="plus" class="w-4 h-4"></i> إضافة مخزن </button>

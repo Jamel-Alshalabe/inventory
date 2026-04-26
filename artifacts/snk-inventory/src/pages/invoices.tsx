@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp, warehouseQuery } from "@/lib/app-context";
 import { api, fmtDate, fmtMoney, type Invoice, type Product } from "@/lib/api";
+import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,23 +133,39 @@ export default function InvoicesPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [view, setView] = useState<Invoice | null>(null);
 
-  const { data: invoices = [] } = useQuery({
+  const { data: invoicesResponse = [] } = useQuery({
     queryKey: ["invoices", selectedWarehouseId],
-    queryFn: () => api.get<Invoice[]>(`/invoices${warehouseQuery(selectedWarehouseId)}`),
+    queryFn: () => customFetch<Invoice[]>(`/api/invoices${warehouseQuery(selectedWarehouseId)}`),
   });
 
-  const { data: products = [] } = useQuery({
+  // Extract invoices array from response
+  const invoices = Array.isArray(invoicesResponse) ? invoicesResponse : (invoicesResponse?.data || []);
+
+  const { data: productsResponse = [] } = useQuery({
     queryKey: ["products", selectedWarehouseId, ""],
-    queryFn: () => api.get<Product[]>(`/products${warehouseQuery(selectedWarehouseId)}`),
+    queryFn: () => customFetch<Product[]>(`/api/products${warehouseQuery(selectedWarehouseId)}`),
   });
+
+  // Extract products array from response
+  const products = Array.isArray(productsResponse) ? productsResponse : (productsResponse?.data || []);
 
   const createMut = useMutation({
-    mutationFn: () =>
-      api.post<Invoice>("/invoices", {
-        customerName: customer,
-        items: lines,
-        warehouseId: selectedWarehouseId,
-      }),
+    mutationFn: () => {
+      const validLines = lines.filter(l => l.productCode && l.quantity > 0);
+      return customFetch<Invoice>("/api/invoices", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: customer,
+          items: validLines.map(l => ({
+            productCode: l.productCode,
+            quantity: l.quantity,
+            price: l.price,
+          })),
+          warehouseId: selectedWarehouseId,
+        }),
+      });
+    },
     onSuccess: (inv) => {
       toast({ title: `تم إنشاء الفاتورة ${inv.invoiceNumber}` });
       qc.invalidateQueries({ queryKey: ["invoices"] });
@@ -162,7 +179,7 @@ export default function InvoicesPage() {
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => api.del(`/invoices/${id}`),
+    mutationFn: (id: number) => customFetch(`/api/invoices/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       toast({ title: "تم الحذف" });
       qc.invalidateQueries({ queryKey: ["invoices"] });
@@ -171,13 +188,16 @@ export default function InvoicesPage() {
   });
 
   function addLine(code: string) {
-    const p = products.find((x) => x.code === code);
+    const p = products.find((x: Product) => x.code === code);
     if (!p) return;
-    if (lines.find((l) => l.productCode === code)) return;
     setLines([
       ...lines,
       { productCode: p.code, productName: p.name, quantity: 1, price: p.sellPrice },
     ]);
+  }
+
+  function addEmptyLine() {
+    setLines([...lines, { productCode: "", productName: "", quantity: 1, price: 0 }]);
   }
 
   function updateLine(idx: number, patch: Partial<Line>) {
@@ -467,28 +487,11 @@ export default function InvoicesPage() {
                     data-testid="input-customer"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>إضافة منتج</Label>
-                  <Select value="" onValueChange={addLine}>
-                    <SelectTrigger data-testid="select-add-product">
-                      <SelectValue placeholder="اختر منتجاً للإضافة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products
-                        .filter((p) => p.quantity > 0 && !lines.find((l) => l.productCode === p.code))
-                        .map((p) => (
-                          <SelectItem key={p.id} value={p.code}>
-                            {p.name} — متاح {p.quantity}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="border rounded-md max-h-72 overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>المنتج</TableHead>
+                        <TableHead className="w-48">المنتج</TableHead>
                         <TableHead className="w-24">الكمية</TableHead>
                         <TableHead className="w-28">السعر</TableHead>
                         <TableHead className="w-28">الإجمالي</TableHead>
@@ -504,8 +507,35 @@ export default function InvoicesPage() {
                         </TableRow>
                       )}
                       {lines.map((l, i) => (
-                        <TableRow key={l.productCode}>
-                          <TableCell className="font-semibold">{l.productName}</TableCell>
+                        <TableRow key={`${l.productCode}-${i}`}>
+                          <TableCell>
+                            <Select
+                              value={l.productCode}
+                              onValueChange={(code) => {
+                                const p = products.find((x: Product) => x.code === code);
+                                if (p) {
+                                  updateLine(i, {
+                                    productCode: p.code,
+                                    productName: p.name,
+                                    price: p.sellPrice,
+                                  });
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue placeholder="اختر منتج" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products
+                                  .filter((p: Product) => p.quantity > 0)
+                                  .map((p: Product) => (
+                                    <SelectItem key={p.id} value={p.code}>
+                                      {p.name} — متاح {p.quantity}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                           <TableCell>
                             <Input
                               type="number"
@@ -537,6 +567,10 @@ export default function InvoicesPage() {
                     </TableBody>
                   </Table>
                 </div>
+                <Button onClick={addEmptyLine} variant="outline" className="w-full">
+                  <Plus className="size-4 ml-2" />
+                  إضافة منتج
+                </Button>
                 <div className="flex justify-between items-center text-lg font-bold">
                   <span>الإجمالي</span>
                   <span data-testid="text-invoice-total">{fmtMoney(total, currency)}</span>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type AuthUser } from "@/lib/api";
+import { api, type AuthUser, type Warehouse } from "@/lib/api";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import { useApp } from "@/lib/app-context";
 import { Card } from "@/components/ui/card";
@@ -37,7 +37,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Edit, Eye, Shield } from "lucide-react";
 
 export default function UsersPage() {
-  const { warehouses, user: me } = useApp();
+  const { warehouses: warehousesResponse, user: me } = useApp();
+
+  // Extract warehouses array from response
+  const warehouses = Array.isArray(warehousesResponse)
+    ? warehousesResponse
+    : (Array.isArray((warehousesResponse as any)?.data) ? (warehousesResponse as any)?.data : []);
   const { toast } = useToast();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -92,27 +97,32 @@ export default function UsersPage() {
 
   const createMut = useMutation({
     mutationFn: async () => {
-      
-      const requestData = {
-        username,
-        password,
-        role,
-        assignedWarehouseId: warehouseId ? Number(warehouseId) : null,
-        max_warehouses: maxWarehouses,
-        permissions: selectedPermissions,
-      };
-      
-      
+      // For super_admin: only send username, password, role, max_warehouses
+      // For admin: send username, password, role, assignedWarehouseId, permissions
+      const requestData = isSuperAdmin
+        ? {
+            username,
+            password,
+            role,
+            max_warehouses: maxWarehouses,
+          }
+        : {
+            username,
+            password,
+            role,
+            assignedWarehouseId: warehouseId ? Number(warehouseId) : null,
+            permissions: selectedPermissions,
+          };
+
       try {
         const response = await api.createUser(requestData);
-        
         return response;
       } catch (error) {
         throw error;
       }
     },
     onSuccess: () => {
-      toast({ 
+      toast({
         title: "تم إضافة المستخدم",
         variant: "default",
         className: "bg-green-500 text-white border-green-600"
@@ -127,10 +137,10 @@ export default function UsersPage() {
       setSelectedPermissions([]);
     },
     onError: (error: any) => {
-      toast({ 
-        title: "فشل إضافة المستخدم", 
+      toast({
+        title: "فشل إضافة المستخدم",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -220,21 +230,42 @@ export default function UsersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>أقصى عدد من المخازن</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={maxWarehouses}
-                  onChange={(e) => setMaxWarehouses(Number(e.target.value))}
-                  data-testid="input-max-warehouses"
-                />
-              </div>
+              {isSuperAdmin && (
+                <div className="space-y-2">
+                  <Label>أقصى عدد من المخازن</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={maxWarehouses}
+                    onChange={(e) => setMaxWarehouses(Number(e.target.value))}
+                    data-testid="input-max-warehouses"
+                  />
+                </div>
+              )}
             </div>
-            
-            {/* Permissions Section - Only for Admins */}
-            {(me?.role === 'admin' || me?.role === 'super_admin') && (
+
+            {/* Warehouse Assignment - Only for Admin (not super_admin) */}
+            {me?.role === 'admin' && (
+              <div className="space-y-2">
+                <Label>إسناد مخزن</Label>
+                <Select value={warehouseId} onValueChange={setWarehouseId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر مخزناً" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((w: Warehouse) => (
+                      <SelectItem key={w.id} value={String(w.id)}>
+                        {w.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Permissions Section - Only for Admins (not superadmin) */}
+            {me?.role === 'admin' && (
               <div className="space-y-3 border-t pt-4">
                 <div className="flex items-center gap-2">
                   <Shield className="size-4 text-primary" />
@@ -453,8 +484,8 @@ export default function UsersPage() {
             </div>
           </div>
           
-          {/* Permissions Section - Only for Admins */}
-          {(me?.role === 'admin' || me?.role === 'super_admin') && (
+          {/* Permissions Section - Only for Admins (not superadmin) */}
+          {me?.role === 'admin' && (
             <div className="space-y-3 border-t pt-4">
               <div className="flex items-center gap-2">
                 <Shield className="size-4 text-primary" />

@@ -249,46 +249,7 @@ export default function LogsPage() {
         )}
       </Card>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Activity className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">إجمالي العمليات</p>
-              <p className="text-2xl font-bold">{logs.length}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <User className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">المستخدمون النشطون</p>
-              <p className="text-2xl font-bold">
-                {new Set(logs.map((log: ActivityLogItem) => log.causerUsername)).size}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Calendar className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">آخر عملية</p>
-              <p className="text-sm font-medium">
-                {logs.length > 0 ? formatDate(logs[0].createdAt) : 'لا يوجد'}
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
+   
     </div>
   );
 }
