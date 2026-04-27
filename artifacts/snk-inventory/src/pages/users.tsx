@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type AuthUser, type Warehouse } from "@/lib/api";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
@@ -22,19 +22,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Edit, Eye, Shield } from "lucide-react";
+import { ColumnDef } from "@tanstack/react-table";
+
+import { PageLoader } from "@/components/ui/page-loader";
 
 export default function UsersPage() {
   const { warehouses: warehousesResponse, user: me } = useApp();
@@ -92,8 +88,93 @@ export default function UsersPage() {
     display_name: string;
   };
 
-  // Debug: Log users data
- 
+  const columns = useMemo<ColumnDef<any>[]>(() => [
+    {
+      accessorKey: "id",
+      header: "المعرف",
+      cell: ({ row }) => <span className="font-medium">#{row.getValue("id")}</span>,
+    },
+    {
+      accessorKey: "username",
+      header: "اسم المستخدم",
+      cell: ({ row }) => <span className="font-semibold">{row.getValue("username")}</span>,
+    },
+    {
+      accessorKey: "role",
+      header: "الدور",
+      cell: ({ row }) => {
+        const role = row.getValue("role") as string;
+        return (
+          <Badge
+            className={
+              role === "admin"
+                ? "bg-primary text-primary-foreground"
+                : role === "user"
+                ? "bg-accent text-accent-foreground"
+                : "bg-muted"
+            }
+          >
+            {role === "admin" ? "مدير" : role === "user" ? "مستخدم" : role === "editor" ? "مراجع حسابات" : role}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "max_warehouses",
+      header: "أقصى عدد مخازن",
+      cell: ({ row }) => <span>{row.getValue("max_warehouses") || 1}</span>,
+    },
+    {
+      id: "actions",
+      header: "الإجراءات",
+      cell: ({ row }) => {
+        const u = row.original;
+        return (
+          <div className="flex gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => {
+                setSelectedUser(u);
+                setViewOpen(true);
+              }}
+            >
+              <Eye className="size-4" />
+            </Button>
+            {u.id !== me?.id && (
+              <>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedUser(u);
+                    setUsername(u.username);
+                    setRole(u.role as "admin" | "user" | "editor");
+                    setWarehouseId(u.assignedWarehouseId?.toString() || "");
+                    setMaxWarehouses(u.max_warehouses || 1);
+                    setSelectedPermissions((u as any).permissions || []);
+                    setEditOpen(true);
+                  }}
+                >
+                  <Edit className="size-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedUser(u);
+                    setDeleteOpen(true);
+                  }}
+                >
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
+              </>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [me?.id]);
 
   const createMut = useMutation({
     mutationFn: async () => {
@@ -181,8 +262,11 @@ export default function UsersPage() {
     onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
   });
 
+  if (isDataLoading) return <PageLoader text="جاري تحميل قائمة المستخدمين..." />;
+  if (!me) return <PageLoader text="جاري التحقق من الهوية..." />;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">المستخدمين</h1>
@@ -272,7 +356,9 @@ export default function UsersPage() {
                   <Label className="text-base font-medium">الصلاحيات</Label>
                 </div>
                 <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto border rounded-md p-3">
-                  {availablePermissions.map((permission: Permission) => (
+                  {availablePermissions
+                    .filter((p: Permission) => p.name.startsWith('view-'))
+                    .map((permission: Permission) => (
                     <div key={permission.id} className="flex items-center space-gap-2 space-x-2">
                       <Checkbox
                         id={`permission-${permission.id}`}
@@ -289,7 +375,7 @@ export default function UsersPage() {
                         htmlFor={`permission-${permission.id}`} 
                         className="text-sm cursor-pointer"
                       >
-                        {permission.display_name}
+                        {permission.display_name.replace('عرض ', 'دخول صفحة ')}
                       </Label>
                     </div>
                   ))}
@@ -301,6 +387,7 @@ export default function UsersPage() {
                 )}
               </div>
             )}
+            
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>
                 إلغاء
@@ -318,121 +405,24 @@ export default function UsersPage() {
           </DialogContent>
         </Dialog>
       </div>
-      <Card className="p-5">
-        <div className="mb-4 flex justify-between items-center">
-          <h3 className="text-lg font-semibold">
-            {isDataLoading ? "جاري تحميل المستخدمين..." : "قائمة المستخدمين"}
+      
+      <Card className="p-0 overflow-hidden border-gray-700 shadow-2xl">
+        <div className="p-5 border-b border-gray-800 flex justify-between items-center ">
+          <h3 className="text-lg font-semibold text-white">
+            قائمة المستخدمين
           </h3>
-          <div className="text-sm text-muted-foreground bg-muted px-3 py-1 rounded">
-            {isDataLoading ? (
-              "جاري التحميل..."
-            ) : (
-              `عرض: ${filterInfo} (${displayUsers.length} مستخدم)`
-            )}
+          <div className="text-sm text-gray-400 bg-gray-800/50 px-3 py-1 rounded">
+            {`عرض: ${filterInfo} (${displayUsers.length} مستخدم)`}
           </div>
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-right">المعرف</TableHead>
-              <TableHead className="text-right">اسم المستخدم</TableHead>
-              <TableHead className="text-right">الدور</TableHead>
-              <TableHead className="text-right">أقصى عدد مخازن</TableHead>
-              <TableHead className="text-right">الإجراءات</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isDataLoading ? (
-              // Loading skeleton
-              Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={`skeleton-${index}`}>
-                  <TableCell>
-                    <Skeleton className="h-4 w-8" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-32" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-6 w-20 rounded-full" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-8" />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Skeleton className="h-8 w-8" />
-                      <Skeleton className="h-8 w-8" />
-                      <Skeleton className="h-8 w-8" />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              displayUsers.map((u) => (
-                <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
-                <TableCell className="font-medium text-right">{u.id}</TableCell>
-                <TableCell className="font-semibold text-right">{u.username}</TableCell>
-                <TableCell>
-                  <Badge
-                    className={
-                      u.role === "admin"
-                        ? "bg-primary text-primary-foreground"
-                        : u.role === "user"
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-muted"
-                    }
-                  >
-                    {u.role === "admin" ? "مدير" : u.role === "user" ? "مستخدم" : u.role === "editor" ? "مراجع حسابات" : u.role}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">{u.max_warehouses || 1}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex gap-1 ">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => {
-                        setSelectedUser(u);
-                        setViewOpen(true);
-                      }}
-                    >
-                      <Eye className="size-4" />
-                    </Button>
-                    {u.id !== me?.id && (
-                      <>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedUser(u);
-                            setUsername(u.username);
-                            setRole(u.role as "admin" | "user" | "editor");
-                            setWarehouseId(u.assignedWarehouseId?.toString() || "");
-                            setMaxWarehouses(u.max_warehouses || 1);
-                            setSelectedPermissions((u as any).permissions || []);
-                            setEditOpen(true);
-                          }}
-                        >
-                          <Edit className="size-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedUser(u);
-                            setDeleteOpen(true);
-                          }}
-                        >
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            )))}
-          </TableBody>
-        </Table>
+        
+        <DataTable 
+          columns={columns} 
+          data={displayUsers} 
+          searchKey="username"
+          searchPlaceholder="بحث عن مستخدم..."
+          emptyMessage="لا يوجد مستخدمين"
+        />
       </Card>
 
       {/* Edit User Dialog */}
@@ -492,7 +482,9 @@ export default function UsersPage() {
                 <Label className="text-base font-medium">الصلاحيات</Label>
               </div>
               <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto border rounded-md p-3">
-                {availablePermissions.map((permission: Permission) => (
+                {availablePermissions
+                  .filter((p: Permission) => p.name.startsWith('view-'))
+                  .map((permission: Permission) => (
                   <div key={permission.id} className="flex items-center space-gap-2 space-x-2">
                     <Checkbox
                       id={`edit-permission-${permission.id}`}
@@ -509,7 +501,7 @@ export default function UsersPage() {
                       htmlFor={`edit-permission-${permission.id}`} 
                       className="text-sm cursor-pointer"
                     >
-                      {permission.display_name}
+                      {permission.display_name.replace('عرض ', 'دخول صفحة ')}
                     </Label>
                   </div>
                 ))}
@@ -618,3 +610,4 @@ export default function UsersPage() {
     </div>
   );
 }
+

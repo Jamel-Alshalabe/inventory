@@ -20,6 +20,8 @@ import { useConfirmation } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, FileSpreadsheet, Download, Search, Upload, CloudUpload, FileUp } from "lucide-react";
 
+import { PageLoader } from "@/components/ui/page-loader";
+
 type FormState = {
   id?: number;
   name: string;
@@ -32,7 +34,11 @@ type FormState = {
 const empty: FormState = { name: "", code: "", buyPrice: "0", sellPrice: "0", quantity: "0" };
 
 export default function ProductsPage() {
-  const { user, selectedWarehouseId } = useApp();
+  const { user, selectedWarehouseId, settings } = useApp();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const { ConfirmationComponent, confirm } = useConfirmation();
+
   const [search, setSearch] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [edit, setEdit] = useState<FormState>(empty);
@@ -49,85 +55,46 @@ export default function ProductsPage() {
     sellPrice: number;
     exists?: boolean;
   }>>([]);
-  const qc = useQueryClient();
-  const { confirm, ConfirmationComponent } = useConfirmation();
-  const { toast } = useToast();
 
-  const { data: dataResponse, isLoading } = useQuery({
-    queryKey: ["products", selectedWarehouseId],
-    queryFn: () => {
-      return api.listProducts(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
-    },
-    retry: 2,
-    staleTime: 30000,
+  const { data: response = { data: [] }, isLoading } = useQuery({
+    queryKey: ["products", selectedWarehouseId, ""],
+    queryFn: () => api.listProducts(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined),
+    enabled: !!selectedWarehouseId,
   });
-  const data = Array.isArray(dataResponse) ? dataResponse : (dataResponse?.data || []);
+
+  const canEdit = user?.role === "admin" || user?.role === "user";
+  const data = Array.isArray(response) ? response : ((response as any).data || []);
+  const currency = settings.currency || "ج.م";
 
   const createMut = useMutation({
     mutationFn: (data: Omit<Product, "id" | "createdAt" | "warehouseName">) => api.createProduct(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
-      qc.invalidateQueries({ queryKey: ["/api/products"] });
       setCreateOpen(false);
       setCreate(empty);
-      toast({
-        title: "نجاح",
-        description: "تم إضافة المنتج بنجاح",
-        variant: "default",
-        className: "bg-green-500 text-white border-green-600"
-      });
+      toast({ title: "تم إضافة المنتج بنجاح" });
     },
-    onError: (error: any) => {
-      toast({
-        title: "خطأ",
-        description: error.message || "فشل إضافة المنتج",
-        variant: "destructive",
-      });
-    },
+    onError: (error: any) => toast({ title: "خطأ", description: error.message, variant: "destructive" }),
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Product> }) => api.updateProduct(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
-      qc.invalidateQueries({ queryKey: ["/api/products"] });
       setEditOpen(false);
       setEdit(empty);
-      toast({
-        title: "نجاح",
-        description: "تم تحديث المنتج بنجاح",
-        variant: "default",
-        className: "bg-green-500 text-white border-green-600"
-      });
+      toast({ title: "تم تحديث المنتج بنجاح" });
     },
-    onError: (error: any) => {
-      toast({
-        title: "خطأ",
-        description: error.message || "فشل تحديث المنتج",
-        variant: "destructive",
-      });
-    },
+    onError: (error: any) => toast({ title: "خطأ", description: error.message, variant: "destructive" }),
   });
 
   const deleteMut = useMutation({
-    mutationFn: api.deleteProduct,
+    mutationFn: (id: number) => api.deleteProduct(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
-      qc.invalidateQueries({ queryKey: ["/api/products"] });
-      toast({
-        title: "نجاح",
-        description: "تم حذف المنتج بنجاح",
-        variant: "default",
-        className: "bg-green-500 text-white border-green-600"
-      });
+      toast({ title: "تم حذف المنتج بنجاح" });
     },
-    onError: (error: any) => {
-      toast({
-        title: "خطأ",
-        description: error.message || "فشل حذف المنتج",
-        variant: "destructive",
-      });
-    },
+    onError: (error: any) => toast({ title: "خطأ", description: error.message, variant: "destructive" }),
   });
 
   const filtered = useMemo(() => {
@@ -141,34 +108,19 @@ export default function ProductsPage() {
   }, [data, search]);
 
   const handleCreate = () => {
-    if (!selectedWarehouseId) {
-      toast({
-        title: "خطأ",
-        description: "يجب اختيار مستودع أولاً",
-        variant: "destructive",
-      });
-      return;
-    }
-    const productData = {
+    if (!selectedWarehouseId) return;
+    createMut.mutate({
       name: create.name.trim(),
       code: create.code.trim(),
       buyPrice: Number(create.buyPrice),
       sellPrice: Number(create.sellPrice),
       quantity: Number(create.quantity),
       warehouseId: selectedWarehouseId,
-    };
-    createMut.mutate(productData);
+    });
   };
 
   const handleUpdate = () => {
-    if (!edit.id || !selectedWarehouseId) {
-      toast({
-        title: "خطأ",
-        description: "بيانات غير مكتملة",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!edit.id || !selectedWarehouseId) return;
     updateMut.mutate({
       id: edit.id,
       data: {
@@ -257,14 +209,13 @@ export default function ProductsPage() {
     setImporting(true);
     try {
       // Use bulk API
-      const result = await api.bulkImportProducts({
+      await api.bulkImportProducts({
         items: newProducts,
         warehouseId: selectedWarehouseId,
       });
 
       // Refresh products list
       qc.invalidateQueries({ queryKey: ["products"] });
-      qc.invalidateQueries({ queryKey: ["/api/products"] });
 
       // Close modal and reset
       setImportOpen(false);
@@ -273,7 +224,6 @@ export default function ProductsPage() {
 
       toast({
         title: "اكتمل الاستيراد",
-        description: `تم إضافة ${result.created} منتج${result.created !== 1 ? "ات" : ""}${result.updated > 0 ? ` وتحديث ${result.updated} منتج` : ""}${previewData.filter(p => p.exists).length > 0 ? `، تم تجاهل ${previewData.filter(p => p.exists).length} منتج موجود` : ""}`,
         variant: "default",
         className: "bg-green-500 text-white border-green-600",
       });
@@ -316,6 +266,19 @@ export default function ProductsPage() {
     return { variant: "default" as const, text: "متوفر" };
   };
 
+  if (isLoading) return <PageLoader text="جاري تحميل المنتجات..." />;
+  if (!user) return <PageLoader text="جاري التحقق من الهوية..." />;
+
+  const displayProducts = filtered;
+
+  function onEdit(p: Product) {
+    openEdit(p);
+  }
+
+  function onDelete(id: number, name: string) {
+    handleDelete(id, name);
+  }
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen" style={{background: "linear-gradient(135deg, #08081a 0%, #0d0d1a 50%, #121230 100%)"}}>
@@ -328,11 +291,11 @@ export default function ProductsPage() {
 
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6" style={{background: "linear-gradient(135deg, #08081a 0%, #0d0d1a 50%, #121230 100%)"}}>
-      <Card className="p-4 sm:p-6 bg-[#16162b] border border-slate-700/50 backdrop-blur-xl">
+      <Card className="p-4 sm:p-6  border border-slate-700/50 backdrop-blur-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
           <h1 className="text-2xl font-bold text-white">المنتجات</h1>
           <div className="flex flex-wrap items-center gap-2">
-            {(user.role === "admin" || user.role === "user") && (
+            {(user.role === "admin" || user.role === "user" || user.role === "editor") && (
               <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                 <DialogTrigger asChild>
                   <Button className="text-sm">
@@ -583,7 +546,7 @@ export default function ProductsPage() {
             </>
           </div>
         </div>
-        <div className="flex items-center gap-2 w-full sm:max-w-md">
+        <div className="flex items-center gap-2 w-full sm:max-w-md py-4">
           <Search className="size-4 text-slate-400 shrink-0" />
           <Input
             placeholder="بحث بالاسم أو الكود..."
@@ -594,10 +557,10 @@ export default function ProductsPage() {
         </div>
         
         {/* Products Table */}
-        <div className="overflow-x-auto">
+        <div className="bg-[#111127] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#1a1a2e] text-slate-300">
+              <tr className="bg-[#0d0d20] text-slate-300">
                 <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">الكود</th>
                 <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">الاسم</th>
                 <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">الكمية</th>

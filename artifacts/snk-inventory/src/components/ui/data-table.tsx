@@ -78,9 +78,9 @@ export function DataTable<TData, TValue>({
   })
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn("space-y-6", className)}>
       {/* Search and Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6">
         <div className="flex items-center space-x-2 space-x-reverse w-full sm:w-auto">
           <div className="relative w-full sm:w-auto">
             <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground size-4" />
@@ -137,7 +137,7 @@ export function DataTable<TData, TValue>({
                 {headerGroup.headers.map((header) => {
                   const metaClassName = (header.column.columnDef.meta as any)?.className || "";
                   return (
-                    <TableHead key={header.id} className={`text-right font-medium ${metaClassName}`}>
+                    <TableHead key={header.id} className={`text-right bg-[#111127] font-bold text-gray-400 border-b border-gray-800 ${metaClassName}`}>
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -156,12 +156,12 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="hover:bg-muted/50"
+                  className="hover:bg-white/[0.02] border-b border-gray-800/50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => {
                     const metaClassName = (cell.column.columnDef.meta as any)?.className || "";
                     return (
-                      <TableCell key={cell.id} className={`text-right ${metaClassName}`}>
+                      <TableCell key={cell.id} className={`text-right bg-[#111127] py-4 text-gray-300 ${metaClassName}`}>
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext()

@@ -75,28 +75,28 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 240 60% 6%;
+  --background: 240 39% 11%;
   --foreground: 210 40% 98%;
 
-  --border: 240 40% 15%;
-  --input: 240 40% 15%;
+  --border: 240 39% 18%;
+  --input: 240 39% 18%;
   --ring: 220 80% 48%;
 
-  --card: 240 40% 10%;
+  --card: 240 39% 11%;
   --card-foreground: 210 40% 98%;
-  --card-border: 240 40% 15%;
+  --card-border: 240 39% 18%;
 
-  --popover: 240 40% 10%;
+  --popover: 240 39% 11%;
   --popover-foreground: 210 40% 98%;
-  --popover-border: 240 40% 15%;
+  --popover-border: 240 39% 18%;
 
   --primary: 220 80% 48%;
   --primary-foreground: 210 40% 98%;
 
-  --secondary: 240 40% 15%;
+  --secondary: 240 39% 18%;
   --secondary-foreground: 210 40% 98%;
 
-  --muted: 240 30% 15%;
+  --muted: 240 30% 18%;
   --muted-foreground: 215 20% 65%;
 
   --accent: 150 60% 45%;
@@ -105,9 +105,9 @@
   --destructive: 0 70% 55%;
   --destructive-foreground: 210 40% 98%;
 
-  --sidebar: 240 40% 10%;
+  --sidebar: 240 39% 12%;
   --sidebar-foreground: 210 40% 98%;
-  --sidebar-border: 240 40% 15%;
+  --sidebar-border: 240 39% 18%;
   --sidebar-primary: 220 80% 48%;
   --sidebar-primary-foreground: 210 40% 98%;
   --sidebar-accent: 240 40% 15%;
@@ -337,6 +337,24 @@
   @keyframes shimmer {
     0%, 100% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
+  }
+
+  @keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(-360deg); }
+  }
+
+  @keyframes shimmer-loading {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
+
+  .animate-spin-slow {
+    animation: spin-slow 3s linear infinite;
+  }
+
+  .animate-shimmer-loading {
+    animation: shimmer-loading 1.5s infinite;
   }
 
   /* Firefox scrollbar support */

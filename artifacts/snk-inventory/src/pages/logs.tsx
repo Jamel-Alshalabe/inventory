@@ -95,7 +95,7 @@ export default function LogsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 max-w-8xl">
       <div>
         <h1 className="text-2xl font-bold">سجل العمليات</h1>
         <p className="text-muted-foreground text-sm mt-1">
@@ -175,7 +175,7 @@ export default function LogsPage() {
                     <TableHead className="w-[140px] text-right font-semibold text-sm">المستخدم</TableHead>
                     <TableHead className="min-w-[200px] text-right font-semibold text-sm">الوصف</TableHead>
                     <TableHead className="w-[130px] text-right font-semibold text-sm">النموذج</TableHead>
-                    <TableHead className="w-[90px] text-right font-semibold text-sm">Admin ID</TableHead>
+                    <TableHead className="w-[90px] text-right font-semibold text-sm">المدير</TableHead>
                     <TableHead className="w-[160px] text-right font-semibold text-sm">التاريخ</TableHead>
                   </TableRow>
                 </TableHeader>

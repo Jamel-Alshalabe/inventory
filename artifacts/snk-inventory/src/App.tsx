@@ -58,12 +58,49 @@ function Routes() {
 
   return (
     <Switch>
-      <Route path="/" component={DashboardPage} />
-      <Route path="/dashboard" component={DashboardPage} />
-      <Route path="/products" component={ProductsPage} />
-      <Route path="/stock-movements" component={StockMovementsPage} />
-      <Route path="/invoices" component={InvoicesPage} />
-      <Route path="/reports" component={ReportsPage} />
+       
+      <Route path="/">
+      {() => (
+          <PermissionGuard permissions={["view-dashboard"]}>
+            <DashboardPage />
+          </PermissionGuard>
+        )}
+      </Route>
+      <Route path="/dashboard">
+      {() => (
+          <PermissionGuard permissions={["view-dashboard"]}>
+            <DashboardPage />
+          </PermissionGuard>
+        )}
+      </Route>
+      <Route path="/products">
+      {() => (
+          <PermissionGuard permissions={["view-products"]}>
+            <ProductsPage />
+          </PermissionGuard>
+        )}
+      </Route>
+      <Route path="/stock-movements">
+      {() => (
+          <PermissionGuard permissions={["view-movements"]}>
+            <StockMovementsPage />
+          </PermissionGuard>
+        )}
+      </Route>
+      <Route path="/invoices">
+      {() => (
+          <PermissionGuard permissions={["view-invoices"]}>
+            <InvoicesPage />
+          </PermissionGuard>
+        )}
+      </Route>
+      <Route path="/reports">
+      {() => (
+          <PermissionGuard permissions={["view-reports"]}>
+            <ReportsPage />
+          </PermissionGuard>
+        )}
+      </Route>
       <Route path="/warehouses">
         {() => (
           <PermissionGuard permissions={["view-warehouses"]}>

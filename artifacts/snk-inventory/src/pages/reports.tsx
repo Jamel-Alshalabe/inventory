@@ -16,8 +16,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Printer, FileSpreadsheet, FileText, Zap, Calendar, Layers, Clock, CalendarDays } from "lucide-react";
+import { Printer, FileSpreadsheet, FileText, Zap, Calendar, Layers, Clock, CalendarDays, Search } from "lucide-react";
 import { useApp, warehouseQuery } from "@/lib/app-context";
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
 
 interface ReportData {
   id: number;
@@ -31,78 +33,144 @@ interface ReportData {
 
 // Print styles - defined outside component to avoid hooks order issues
 const printStyles = `
+  @media screen {
+    .print-only-section {
+      display: none !important;
+    }
+  }
   @media print {
+    @page {
+      size: A4;
+      margin: 0;
+    }
+    body * {
+      visibility: hidden !important;
+    }
+    .print-only-section, .print-only-section * {
+      visibility: visible !important;
+    }
+    .print-only-section {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      background: white !important;
+      display: block !important;
+      padding: 1cm !important;
+      z-index: 9999 !important;
+    }
     body {
       background: white !important;
       color: black !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
+      font-family: 'Tahoma', sans-serif;
     }
-    .print-only-section {
-      display: block !important;
-      padding: 20px;
+    .print-header {
+      background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%) !important;
+      color: white !important;
+      padding: 30px !important;
+      text-align: center !important;
+      border-radius: 8px !important;
+      margin-bottom: 30px !important;
+      -webkit-print-color-adjust: exact !important;
     }
-    .print-only-section * {
+    .print-header h2 {
+      font-size: 28px !important;
+      margin-bottom: 10px !important;
+      color: white !important;
+    }
+    .print-header p {
+      font-size: 14px !important;
+      opacity: 0.9 !important;
+      color: white !important;
+    }
+    .print-summary {
+      display: grid !important;
+      grid-template-columns: repeat(4, 1fr) !important;
+      gap: 15px !important;
+      margin-bottom: 30px !important;
+    }
+    .summary-box {
+      padding: 15px !important;
+      border-radius: 8px !important;
+      text-align: center !important;
+      color: white !important;
+      -webkit-print-color-adjust: exact !important;
+    }
+    .bg-profit { background-color: #ef4444 !important; }
+    .bg-remaining { background-color: #3b82f6 !important; }
+    .bg-export { background-color: #f97316 !important; }
+    .bg-import { background-color: #22c55e !important; }
+    
+    .summary-box p:first-child {
+      font-size: 11px !important;
+      margin-bottom: 5px !important;
+      font-weight: bold !important;
+      color: white !important;
+    }
+    .summary-box p:last-child {
+      font-size: 20px !important;
+      font-weight: 800 !important;
+      color: white !important;
+    }
+    
+    table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+    }
+    th {
+      background-color: #1e3a8a !important;
+      color: white !important;
+      padding: 12px 8px !important;
+      text-align: right !important;
+      font-size: 12px !important;
+      border: 1px solid #ddd !important;
+      -webkit-print-color-adjust: exact !important;
+    }
+    td {
+      padding: 10px 8px !important;
+      border: 1px solid #ddd !important;
+      font-size: 11px !important;
+      text-align: right !important;
       color: black !important;
     }
-    .print-only-section .bg-gradient-to-r {
-      background: #1e40af !important;
+    tr:nth-child(even) {
+      background-color: #f8fafc !important;
       -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
     }
-    .print-only-section .bg-red-500 {
-      background-color: #ef4444 !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    .print-only-section .bg-blue-500 {
-      background-color: #3b82f6 !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    .print-only-section .bg-orange-500 {
-      background-color: #f97316 !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    .print-only-section .bg-green-500 {
-      background-color: #22c55e !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    .print-only-section .bg-orange-500 span,
-    .print-only-section .bg-green-500 span {
-      color: white !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    .print-only-section table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .print-only-section th,
-    .print-only-section td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: right;
-    }
-    .print-only-section th {
-      background: #1e40af !important;
-      color: white !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    .print-only-section tr:nth-child(even) {
-      background-color: #eff6ff !important;
+    .badge-out { background-color: #f97316 !important; color: white !important; padding: 2px 6px !important; border-radius: 4px !important; font-size: 10px !important; -webkit-print-color-adjust: exact !important; }
+    .badge-in { background-color: #22c55e !important; color: white !important; padding: 2px 6px !important; border-radius: 4px !important; font-size: 10px !important; -webkit-print-color-adjust: exact !important; }
+    
+    .print-footer {
+      margin-top: 40px !important;
+      text-align: center !important;
+      border-top: 1px solid #eee !important;
+      padding-top: 20px !important;
+      font-size: 10px !important;
+      color: #666 !important;
     }
   }
 `;
 
 export default function ReportsPage() {
   const { toast } = useToast();
-  const { selectedWarehouseId } = useApp();
+  const { selectedWarehouseId, settings } = useApp();
   const [quickReportOpen, setQuickReportOpen] = useState(false);
   const [productReportOpen, setProductReportOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [showProductResult, setShowProductResult] = useState(false);
+  const [productStats, setProductStats] = useState({
+    inQty: 0,
+    inVal: 0,
+    outQty: 0,
+    outVal: 0,
+    buyPrice: 0,
+    sellPrice: 0,
+    code: "",
+    movements: [] as any[]
+  });
   const [printOptionsOpen, setPrintOptionsOpen] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -114,92 +182,155 @@ export default function ReportsPage() {
     queryFn: () => customFetch<Movement[]>(`/api/movements${warehouseQuery(selectedWarehouseId)}`),
   });
 
-  // Extract movements array from response
-  const movements = Array.isArray(movementsResponse) ? movementsResponse : (Array.isArray((movementsResponse as any)?.data) ? (movementsResponse as any)?.data : []);
+  // Extract movements array from response and filter by warehouse
+  const movements = Array.isArray(movementsResponse) 
+    ? movementsResponse 
+    : (Array.isArray((movementsResponse as any)?.data) ? (movementsResponse as any)?.data : []);
 
-  // Convert movements to report data
-  const convertToReportData = (movements: Movement[]): ReportData[] => {
-    return movements.map(movement => ({
+  // Convert movements to report data - Memoized to prevent re-creation
+  const allReportData = useState<ReportData[]>([]);
+
+  // Filtering functions
+  const filterByDateRange = (start: string, end: string) => {
+    if (!movements.length) return;
+    
+    const reportData = movements.map((movement: Movement) => ({
       id: movement.id,
       date: movement.createdAt.split('T')[0],
-      type: movement.type === 'out' ? 'صادر' : 'وارد',
+      type: movement.type === 'out' ? 'صادر' : 'وارد' as const,
       product: movement.productName,
       quantity: movement.quantity,
       price: movement.price,
       total: movement.total,
     }));
-  };
 
-  // Initialize filtered data with all data
-  useEffect(() => {
-    setFilteredData(convertToReportData(movements));
-  }, [movements]);
+    if (!start && !end) {
+      setFilteredData(reportData);
+      return;
+    }
 
-  // Inject print styles
-  useEffect(() => {
-    const styleElement = document.createElement('style');
-    styleElement.innerHTML = printStyles;
-    styleElement.id = 'reports-print-styles';
-    document.head.appendChild(styleElement);
-    
-    return () => {
-      const existingStyle = document.getElementById('reports-print-styles');
-      if (existingStyle) {
-        document.head.removeChild(existingStyle);
-      }
-    };
-  }, []);
-
-  // Filtering functions
-  const filterByDateRange = (start: string, end: string) => {
-    const reportData = convertToReportData(movements);
     const filtered = reportData.filter((item: ReportData) => {
       const itemDate = new Date(item.date);
-      const startDate = new Date(start);
-      const endDate = new Date(end);
-      return itemDate >= startDate && itemDate <= endDate;
+      const sDate = start ? new Date(start) : new Date(0);
+      const eDate = end ? new Date(end) : new Date();
+      
+      // Normalize dates to start of day for accurate comparison
+      itemDate.setHours(0,0,0,0);
+      sDate.setHours(0,0,0,0);
+      eDate.setHours(0,0,0,0);
+      
+      return itemDate >= sDate && itemDate <= eDate;
     });
     setFilteredData(filtered);
   };
 
   const filterLastWeek = () => {
     const today = new Date();
-    const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    setStartDate(lastWeek.toISOString().split('T')[0]);
-    setEndDate(today.toISOString().split('T')[0]);
-    filterByDateRange(lastWeek.toISOString().split('T')[0], today.toISOString().split('T')[0]);
+    const lastWeek = new Date();
+    lastWeek.setDate(today.getDate() - 7);
+    
+    const s = lastWeek.toISOString().split('T')[0];
+    const e = today.toISOString().split('T')[0];
+    setStartDate(s);
+    setEndDate(e);
+    filterByDateRange(s, e);
   };
 
   const filterLastMonth = () => {
     const today = new Date();
-    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
-    setStartDate(lastMonth.toISOString().split('T')[0]);
-    setEndDate(today.toISOString().split('T')[0]);
-    filterByDateRange(lastMonth.toISOString().split('T')[0], today.toISOString().split('T')[0]);
+    const lastMonth = new Date();
+    lastMonth.setMonth(today.getMonth() - 1);
+    
+    const s = lastMonth.toISOString().split('T')[0];
+    const e = today.toISOString().split('T')[0];
+    setStartDate(s);
+    setEndDate(e);
+    filterByDateRange(s, e);
   };
 
   const filterLastYear = () => {
     const today = new Date();
-    const lastYear = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
-    setStartDate(lastYear.toISOString().split('T')[0]);
-    setEndDate(today.toISOString().split('T')[0]);
-    filterByDateRange(lastYear.toISOString().split('T')[0], today.toISOString().split('T')[0]);
+    const lastYear = new Date();
+    lastYear.setFullYear(today.getFullYear() - 1);
+    
+    const s = lastYear.toISOString().split('T')[0];
+    const e = today.toISOString().split('T')[0];
+    setStartDate(s);
+    setEndDate(e);
+    filterByDateRange(s, e);
   };
 
   const showAllData = () => {
     setStartDate("");
     setEndDate("");
-    setFilteredData(convertToReportData(movements));
+    filterByDateRange("", "");
   };
+
+  // Initialize filtered data with all data - memoized to prevent infinite loop
+  useEffect(() => {
+    if (movements.length > 0 && filteredData.length === 0 && !startDate && !endDate) {
+      filterByDateRange("", "");
+    }
+  }, [movements]);
 
   // Calculate summary data based on filtered data
   const totalExport = filteredData.filter(item => item.type === "صادر").reduce((sum, item) => sum + item.total, 0);
   const totalImport = filteredData.filter(item => item.type === "وارد").reduce((sum, item) => sum + item.total, 0);
   const profitLoss = totalImport - totalExport;
-  const remainingQuantity = filteredData.reduce((sum, item) => {
+  const remainingQuantity = Math.abs(filteredData.reduce((sum, item) => {
     if (item.type === "وارد") return sum + item.quantity;
     return sum - item.quantity;
-  }, 0);
+  }, 0));
+
+  const columns: ColumnDef<ReportData>[] = [
+    {
+      accessorKey: "date",
+      header: "التاريخ",
+    },
+    {
+      accessorKey: "type",
+      header: "النوع",
+      cell: ({ row }) => {
+        const type = row.getValue("type") as string;
+        return (
+          <span
+            className={`px-2 py-1 rounded text-xs font-semibold ${
+              type === "صادر" 
+                ? "bg-red-600 text-white" 
+                : "bg-blue-600 text-white"
+            }`}
+          >
+            {type}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: "product",
+      header: "المنتج",
+      cell: ({ row }) => (
+        <span className="font-medium text-gray-300">{row.getValue("product")}</span>
+      ),
+    },
+    {
+      accessorKey: "quantity",
+      header: "الكمية",
+    },
+    {
+      accessorKey: "price",
+      header: "السعر",
+      cell: ({ row }) => `Fr ${parseFloat(row.getValue("price")).toLocaleString('ar-EG')}`,
+    },
+    {
+      accessorKey: "total",
+      header: "الإجمالي",
+      cell: ({ row }) => (
+        <span className="font-semibold text-gray-300">
+          Fr {parseFloat(row.getValue("total")).toLocaleString('ar-EG')}
+        </span>
+      ),
+    },
+  ];
 
   const handlePrint = () => {
     setPrintOptionsOpen(true);
@@ -262,14 +393,32 @@ export default function ReportsPage() {
     toast({ title: "جاري طباعة التقرير..." });
   };
 
-  const handleQuickReport = () => {
-    if (!startDate || !endDate) {
-      toast({ title: "خطأ", description: "الرجاء تحديد تاريخ البدء والنهاية", variant: "destructive" });
+  const handleProductReportView = () => {
+    if (!selectedProduct || !startDate || !endDate) {
+      toast({ title: "خطأ", description: "الرجاء اختيار منتج وتحديد التاريخ", variant: "destructive" });
       return;
     }
-    toast({ title: "تم إنشاء التقرير السريع" });
-    setQuickReportOpen(false);
-    handlePrint();
+
+    const pMovements = movements.filter(m => 
+      m.productName === selectedProduct && 
+      new Date(m.createdAt) >= new Date(startDate) && 
+      new Date(m.createdAt) <= new Date(endDate)
+    );
+
+    const firstMove = pMovements[0];
+    
+    setProductStats({
+      inQty: pMovements.filter(m => m.type === 'in').reduce((s, m) => s + m.quantity, 0),
+      inVal: pMovements.filter(m => m.type === 'in').reduce((s, m) => s + m.total, 0),
+      outQty: pMovements.filter(m => m.type === 'out').reduce((s, m) => s + m.quantity, 0),
+      outVal: pMovements.filter(m => m.type === 'out').reduce((s, m) => s + m.total, 0),
+      buyPrice: firstMove?.price || 0,
+      sellPrice: firstMove?.price || 0,
+      code: firstMove?.productCode || "---",
+      movements: pMovements.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    });
+
+    setShowProductResult(true);
   };
 
   return (
@@ -280,185 +429,184 @@ export default function ReportsPage() {
         <p className="text-gray-400 text-sm">نظرة عامة على حركة المخزون</p>
       </div>
 
-      {/* All Buttons in One Container */}
-      <div className="flex flex-wrap gap-2">
+      {/* Quick Action Buttons - Professional Layout */}
+      <div className="bg-[#111127] p-1.5 rounded-2xl border border-gray-800/50 inline-flex flex-wrap gap-1.5 shadow-2xl backdrop-blur-xl">
         {/* Filter Buttons */}
-        <Button 
-          onClick={filterLastWeek} 
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition"
-        >
-          <Clock className="size-4 ml-2" />
-          آخر أسبوع
-        </Button>
-        <Button 
-          onClick={filterLastMonth} 
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition"
-        >
-          <CalendarDays className="size-4 ml-2" />
-          آخر شهر
-        </Button>
-        <Button 
-          onClick={filterLastYear} 
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition"
-        >
-          <Clock className="size-4 ml-2" />
-          آخر سنة
-        </Button>
-        <Button 
-          onClick={showAllData} 
-          className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition"
-        >
-          <Calendar className="size-4 ml-2" />
-          الكل
-        </Button>
+        <div className="flex gap-1.5 p-1 bg-gray-900/50 rounded-xl border border-white/5">
+          <Button 
+            onClick={filterLastWeek} 
+            className="h-10 bg-blue-600 hover:bg-blue-500 text-white px-5 rounded-lg text-xs font-bold transition-all duration-300 hover:scale-[1.02] active:scale-95 shadow-lg shadow-blue-900/20 flex items-center gap-2 group"
+          >
+            <Clock className="size-3.5 group-hover:rotate-12 transition-transform" />
+            آخر أسبوع
+          </Button>
+          <Button 
+            onClick={filterLastMonth} 
+            className="h-10 bg-blue-600 hover:bg-blue-500 text-white px-5 rounded-lg text-xs font-bold transition-all duration-300 hover:scale-[1.02] active:scale-95 shadow-lg shadow-blue-900/20 flex items-center gap-2 group"
+          >
+            <CalendarDays className="size-3.5 group-hover:rotate-12 transition-transform" />
+            آخر شهر
+          </Button>
+          <Button 
+            onClick={filterLastYear} 
+            className="h-10 bg-blue-600 hover:bg-blue-500 text-white px-5 rounded-lg text-xs font-bold transition-all duration-300 hover:scale-[1.02] active:scale-95 shadow-lg shadow-blue-900/20 flex items-center gap-2 group"
+          >
+            <Clock className="size-3.5 group-hover:rotate-12 transition-transform" />
+            آخر سنة
+          </Button>
+          <Button 
+            onClick={showAllData} 
+            className="h-10 bg-gray-800 hover:bg-gray-700 text-white px-5 rounded-lg text-xs font-bold transition-all duration-300 hover:scale-[1.02] active:scale-95 border border-white/5 flex items-center gap-2 group"
+          >
+            <Calendar className="size-3.5 group-hover:scale-110 transition-transform" />
+            الكل
+          </Button>
+        </div>
         
         {/* Report Type & Export Buttons */}
-        <Button 
-          onClick={() => setQuickReportOpen(true)} 
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
-        >
-          <Zap className="size-4 ml-2" />
-          تقرير سريع
-        </Button>
-        <Button 
-          onClick={() => setProductReportOpen(true)} 
-          className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
-        >
-          <Layers className="size-4 ml-2" />
-          تقرير منتج
-        </Button>
-        <Button 
-          onClick={handleExportPDF} 
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
-        >
-          <FileText className="size-4 ml-2" />
-          PDF
-        </Button>
-        <Button 
-          onClick={handleExportCSV} 
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
-        >
-          <FileSpreadsheet className="size-4 ml-2" />
-          Excel
-        </Button>
+        <div className="flex gap-1.5 p-1 bg-gray-900/50 rounded-xl border border-white/5">
+          <Button 
+            onClick={() => setQuickReportOpen(true)} 
+            className="h-10 bg-purple-600 hover:bg-purple-500 text-white px-5 rounded-lg text-xs font-bold transition-all duration-300 hover:scale-[1.02] active:scale-95 shadow-lg shadow-purple-900/20 flex items-center gap-2 group"
+          >
+            <Zap className="size-3.5 group-hover:animate-pulse" />
+            تقرير سريع
+          </Button>
+          <Button 
+            onClick={() => setProductReportOpen(true)} 
+            className="h-10 bg-amber-600 hover:bg-amber-500 text-white px-5 rounded-lg text-xs font-bold transition-all duration-300 hover:scale-[1.02] active:scale-95 shadow-lg shadow-amber-900/20 flex items-center gap-2 group"
+          >
+            <Layers className="size-3.5 group-hover:rotate-12 transition-transform" />
+            تقرير منتج
+          </Button>
+          <Button 
+            onClick={handleExportPDF} 
+            className="h-10 bg-green-600 hover:bg-green-500 text-white px-5 rounded-lg text-xs font-bold transition-all duration-300 hover:scale-[1.02] active:scale-95 shadow-lg shadow-green-900/20 flex items-center gap-2 group"
+          >
+            <FileText className="size-3.5 group-hover:translate-y-[-1px] transition-transform" />
+            PDF
+          </Button>
+          <Button 
+            onClick={handleExportCSV} 
+            className="h-10 bg-emerald-600 hover:bg-emerald-500 text-white px-5 rounded-lg text-xs font-bold transition-all duration-300 hover:scale-[1.02] active:scale-95 shadow-lg shadow-emerald-900/20 flex items-center gap-2 group"
+          >
+            <FileSpreadsheet className="size-3.5 group-hover:translate-y-[-1px] transition-transform" />
+            Excel
+          </Button>
+        </div>
       </div>
 
-      {/* Date Range Filter */}
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="space-y-1">
-          <Label className="text-xs text-gray-400">من</Label>
+      {/* Date Range Filter - Premium Header Style */}
+      <div className="flex flex-wrap gap-4 items-end bg-[#111127] p-6 rounded-2xl border border-gray-800/50 shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-blue-600/10 transition-colors duration-700"></div>
+        <div className="space-y-1.5 relative z-10">
+          <Label className="text-[10px] uppercase tracking-widest text-gray-500 font-black mr-1">من تاريخ</Label>
           <Input
             type="date"
             value={startDate}
             onChange={(e) => {
               setStartDate(e.target.value);
-              if (endDate) {
-                filterByDateRange(e.target.value, endDate);
-              }
+              if (endDate) filterByDateRange(e.target.value, endDate);
             }}
-            className="bg-gray-800 border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none w-40"
+            className="bg-[#0f0f1a] border-gray-700 text-white rounded-xl px-4 h-11 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all w-48 shadow-inner"
           />
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-gray-400">إلى</Label>
+        <div className="space-y-1.5 relative z-10">
+          <Label className="text-[10px] uppercase tracking-widest text-gray-500 font-black mr-1">إلى تاريخ</Label>
           <Input
             type="date"
             value={endDate}
             onChange={(e) => {
               setEndDate(e.target.value);
-              if (startDate) {
-                filterByDateRange(startDate, e.target.value);
-              }
+              if (startDate) filterByDateRange(startDate, e.target.value);
             }}
-            className="bg-gray-800 border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none w-40"
+            className="bg-[#0f0f1a] border-gray-700 text-white rounded-xl px-4 h-11 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all w-48 shadow-inner"
           />
         </div>
         <Button 
           onClick={() => { if (startDate && endDate) filterByDateRange(startDate, endDate); }} 
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition h-10"
+          className="bg-blue-600 hover:bg-blue-500 text-white px-8 h-11 rounded-xl text-sm transition-all duration-300 font-black shadow-lg shadow-blue-900/40 active:scale-95 relative z-10"
         >
-          عرض
+          تحديث التقرير
         </Button>
       </div>
 
-      {/* Summary Cards - Dark Theme */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-          <p className="text-gray-400 text-sm mb-1">إجمالي الوارد</p>
-          <p className="text-2xl font-bold text-green-400 font-mono">
+      {/* Summary Cards - Premium Glass Style */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="bg-[#111127] rounded-2xl p-6 border border-gray-800/50 shadow-xl hover:border-green-500/30 transition-all duration-500 group relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full -mr-12 -mt-12 blur-2xl group-hover:bg-green-500/10 transition-colors"></div>
+          <div className="flex justify-between items-start relative z-10">
+            <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">إجمالي الوارد</p>
+            <div className="p-2 bg-green-500/10 rounded-lg text-green-500 group-hover:scale-110 transition-transform duration-300">
+              <Zap className="size-4" />
+            </div>
+          </div>
+          <p className="text-3xl font-black text-green-400 font-mono tracking-tighter relative z-10">
             Fr {totalImport.toLocaleString('ar-EG')}
           </p>
+          <div className="mt-4 w-full h-1 bg-gray-900 rounded-full overflow-hidden relative z-10">
+            <div className="h-full bg-green-500 w-full opacity-20"></div>
+          </div>
         </div>
-        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-          <p className="text-gray-400 text-sm mb-1">إجمالي الصادر</p>
-          <p className="text-2xl font-bold text-amber-400 font-mono">
+
+        <div className="bg-[#111127] rounded-2xl p-6 border border-gray-800/50 shadow-xl hover:border-amber-500/30 transition-all duration-500 group relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -mr-12 -mt-12 blur-2xl group-hover:bg-amber-500/10 transition-colors"></div>
+          <div className="flex justify-between items-start relative z-10">
+            <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">إجمالي الصادر</p>
+            <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500 group-hover:scale-110 transition-transform duration-300">
+              <Layers className="size-4" />
+            </div>
+          </div>
+          <p className="text-3xl font-black text-amber-400 font-mono tracking-tighter relative z-10">
             Fr {totalExport.toLocaleString('ar-EG')}
           </p>
+          <div className="mt-4 w-full h-1 bg-gray-900 rounded-full overflow-hidden relative z-10">
+            <div className="h-full bg-amber-500 w-full opacity-20"></div>
+          </div>
         </div>
-        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-          <p className="text-gray-400 text-sm mb-1">الكمية المتبقية</p>
-          <p className="text-2xl font-bold text-white font-mono">
+
+        <div className="bg-[#111127] rounded-2xl p-6 border border-gray-800/50 shadow-xl hover:border-blue-500/30 transition-all duration-500 group relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-12 -mt-12 blur-2xl group-hover:bg-blue-500/10 transition-colors"></div>
+          <div className="flex justify-between items-start relative z-10">
+            <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">الكمية المتبقية</p>
+            <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500 group-hover:scale-110 transition-transform duration-300">
+              <Calendar className="size-4" />
+            </div>
+          </div>
+          <p className="text-3xl font-black text-white font-mono tracking-tighter relative z-10">
             {remainingQuantity.toLocaleString('ar-EG')}
           </p>
+          <div className="mt-4 w-full h-1 bg-gray-900 rounded-full overflow-hidden relative z-10">
+            <div className="h-full bg-blue-500 w-full opacity-20"></div>
+          </div>
         </div>
-        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-          <p className="text-gray-400 text-sm mb-1">الربح / الخسارة</p>
-          <p className={`text-2xl font-bold font-mono ${profitLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+
+        <div className="bg-[#111127] rounded-2xl p-6 border border-gray-800/50 shadow-xl hover:border-emerald-500/30 transition-all duration-500 group relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 blur-2xl group-hover:bg-emerald-500/10 transition-colors"></div>
+          <div className="flex justify-between items-start relative z-10">
+            <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">الربح / الخسارة</p>
+            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500 group-hover:scale-110 transition-transform duration-300">
+              <Clock className="size-4" />
+            </div>
+          </div>
+          <p className={`text-3xl font-black font-mono tracking-tighter relative z-10 ${profitLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             Fr {profitLoss.toLocaleString('ar-EG')}{profitLoss < 0 ? '-' : ''}
           </p>
+          <div className="mt-4 w-full h-1 bg-gray-900 rounded-full overflow-hidden relative z-10">
+            <div className={`h-full w-full opacity-20 ${profitLoss >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+          </div>
         </div>
       </div>
 
       {/* Data Table - Dark Theme */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="text-gray-400">جاري تحميل البيانات...</div>
-          </div>
-        ) : filteredData.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
-            لا توجد بيانات للعرض
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-gray-800 text-gray-300">
-                <TableRow>
-                  <TableHead className="text-right px-4 py-3 bg-gray-800">التاريخ</TableHead>
-                  <TableHead className="text-right px-4 py-3 bg-gray-800">النوع</TableHead>
-                  <TableHead className="text-right px-4 py-3 bg-gray-800">المنتج</TableHead>
-                  <TableHead className="text-right px-4 py-3 bg-gray-800">الكمية</TableHead>
-                  <TableHead className="text-right px-4 py-3 bg-gray-800">السعر</TableHead>
-                  <TableHead className="text-right px-4 py-3 bg-gray-800">الإجمالي</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredData.map((item) => (
-                  <TableRow key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                    <TableCell className="text-right px-4 py-3 text-gray-300">{item.date}</TableCell>
-                    <TableCell className="text-right px-4 py-3">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-semibold ${
-                          item.type === "صادر" 
-                            ? "bg-red-600 text-white" 
-                            : "bg-blue-600 text-white"
-                        }`}
-                      >
-                        {item.type}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right px-4 py-3 font-medium text-gray-300">{item.product}</TableCell>
-                    <TableCell className="text-right px-4 py-3 text-gray-300">{item.quantity}</TableCell>
-                    <TableCell className="text-right px-4 py-3 text-gray-300">Fr {item.price.toLocaleString('ar-EG')}</TableCell>
-                    <TableCell className="text-right px-4 py-3 font-semibold text-gray-300">
-                      Fr {item.total.toLocaleString('ar-EG')}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+      <div className="bg-[#111127] rounded-xl border border-gray-700 overflow-hidden shadow-xl">
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          searchKey="product"
+          searchPlaceholder="بحث بالمنتج..."
+          emptyMessage={isLoading ? "جاري تحميل البيانات..." : "لا توجد بيانات للعرض"}
+        />
       </div>
 
       {/* Print Button */}
@@ -474,72 +622,64 @@ export default function ReportsPage() {
 
       {/* Print-Only Section - Styled for printing */}
       <div className="hidden print:block print-only-section">
-        {/* Print Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 text-center mb-6">
-          <h2 className="text-3xl font-bold mb-2">📊 تقرير حركة المخزون</h2>
-          <p className="text-sm opacity-90 mb-1">شركة منصة قطع غيار السيارات</p>
-          <p className="text-sm opacity-90">الفترة من {startDate || 'كل الفترة'} إلى {endDate || 'كل الفترة'}</p>
+        <div className="print-header">
+          <h2>📊 تقرير حركة المخزون</h2>
+          <p className="font-bold text-lg mb-1">{settings.companyName || 'شركة سنك'}</p>
+          <p>الفترة: من {startDate || 'بداية السجل'} إلى {endDate || 'اليوم'}</p>
         </div>
 
-        {/* Print Summary Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-red-500 text-white p-4 rounded-lg text-center">
-            <p className="text-sm mb-1">💰 الربح/الخسارة</p>
-            <p className="text-2xl font-bold">{profitLoss.toLocaleString('ar-EG')}</p>
-            <p className="text-sm">Fr</p>
+        <div className="print-summary">
+          <div className="summary-box bg-profit">
+            <p>💰 الربح/الخسارة</p>
+            <p>{profitLoss.toLocaleString('ar-EG')} Fr</p>
           </div>
-          <div className="bg-blue-500 text-white p-4 rounded-lg text-center">
-            <p className="text-sm mb-1">📦 المتبقي</p>
-            <p className="text-2xl font-bold">{remainingQuantity.toLocaleString('ar-EG')}</p>
-            <p className="text-sm">وحدة</p>
+          <div className="summary-box bg-remaining">
+            <p>📦 المتبقي</p>
+            <p>{remainingQuantity.toLocaleString('ar-EG')} وحدة</p>
           </div>
-          <div className="bg-orange-500 text-white p-4 rounded-lg text-center">
-            <p className="text-sm mb-1">📤 إجمالي الصادر</p>
-            <p className="text-2xl font-bold">{totalExport.toLocaleString('ar-EG')}</p>
-            <p className="text-sm">Fr</p>
+          <div className="summary-box bg-export">
+            <p>📤 إجمالي الصادر</p>
+            <p>{totalExport.toLocaleString('ar-EG')} Fr</p>
           </div>
-          <div className="bg-green-500 text-white p-4 rounded-lg text-center">
-            <p className="text-sm mb-1">📥 إجمالي الوارد</p>
-            <p className="text-2xl font-bold">{totalImport.toLocaleString('ar-EG')}</p>
-            <p className="text-sm">Fr</p>
+          <div className="summary-box bg-import">
+            <p>📥 إجمالي الوارد</p>
+            <p>{totalImport.toLocaleString('ar-EG')} Fr</p>
           </div>
         </div>
 
-        {/* Print Data Table */}
-        <table className="w-full text-sm border-collapse border border-gray-300">
-          <thead className="bg-gradient-to-r from-blue-600 to-blue-800 text-white">
+        <table>
+          <thead>
             <tr>
-              <th className="px-4 py-3 text-right border border-gray-300">التاريخ</th>
-              <th className="px-4 py-3 text-right border border-gray-300">النوع</th>
-              <th className="px-4 py-3 text-right border border-gray-300">المنتج</th>
-              <th className="px-4 py-3 text-right border border-gray-300">الكمية</th>
-              <th className="px-4 py-3 text-right border border-gray-300">السعر</th>
-              <th className="px-4 py-3 text-right border border-gray-300">الإجمالي</th>
+              <th>التاريخ</th>
+              <th>النوع</th>
+              <th>المنتج</th>
+              <th>الكمية</th>
+              <th>السعر</th>
+              <th>الإجمالي</th>
             </tr>
           </thead>
           <tbody>
-            {filteredData.map((item, index) => (
-              <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
-                <td className="px-4 py-3 text-right border border-gray-300">{item.date}</td>
-                <td className="px-4 py-3 text-right border border-gray-300">
-                  <span 
-                    className={`px-2 py-1 rounded text-xs font-semibold ${
-                      item.type === "صادر" 
-                        ? "bg-orange-500 text-white" 
-                        : "bg-green-500 text-white"
-                    }`}
-                  >
+            {filteredData.map((item) => (
+              <tr key={item.id}>
+                <td>{item.date}</td>
+                <td>
+                  <span className={item.type === "صادر" ? "badge-out" : "badge-in"}>
                     {item.type}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right border border-gray-300 font-medium">{item.product}</td>
-                <td className="px-4 py-3 text-right border border-gray-300">{item.quantity}</td>
-                <td className="px-4 py-3 text-right border border-gray-300">{item.price.toLocaleString('ar-EG')}</td>
-                <td className="px-4 py-3 text-right border border-gray-300 font-semibold">{item.total.toLocaleString('ar-EG')}</td>
+                <td className="font-bold">{item.product}</td>
+                <td>{item.quantity}</td>
+                <td>{item.price.toLocaleString('ar-EG')}</td>
+                <td className="font-bold">{item.total.toLocaleString('ar-EG')}</td>
               </tr>
             ))}
           </tbody>
         </table>
+
+        <div className="print-footer">
+          <p>تم استخراج هذا التقرير بتاريخ {new Date().toLocaleString('ar-EG')}</p>
+          <p>جميع الحقوق محفوظة © {settings.companyName || 'شركة سنك'}</p>
+        </div>
       </div>
 
       {/* Quick Report Dialog - Matching test.txt design */}
@@ -641,106 +781,164 @@ export default function ReportsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Product Report Dialog - Matching test.txt design */}
-      <Dialog open={productReportOpen} onOpenChange={setProductReportOpen}>
-        <DialogContent dir="rtl" className="sm:max-w-2xl max-h-[90vh] bg-gray-800 border-gray-700 text-white p-0 overflow-hidden">
-          <DialogHeader className="p-5 border-b border-gray-700 sticky top-0 z-10 bg-gray-800">
-            <DialogTitle className="flex items-center justify-between text-white text-lg font-bold">
-              <span className="flex items-center gap-2">
-                <Layers className="size-5 text-amber-400" />
-                 تقرير المنتج
-              </span>
-            </DialogTitle>
-          </DialogHeader>
+      {/* Product Report Dialog - Exactly matching user images */}
+      <Dialog open={productReportOpen} onOpenChange={(o) => {
+        setProductReportOpen(o);
+        if (!o) {
+          setShowProductResult(false);
+          setSelectedProduct("");
+        }
+      }}>
+        <DialogContent dir="rtl" className="sm:max-w-2xl bg-[#1e1e2d] border-[#2b2b3b] text-white p-0 overflow-hidden shadow-2xl rounded-2xl">
+          <div className="flex items-center justify-between p-5 border-b border-[#2b2b3b] sticky top-0 z-10 bg-[#1e1e2d]">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              📊 {showProductResult ? `تقرير ${selectedProduct}` : "تقرير المنتج"}
+            </h3>
+          </div>
 
           <div className="p-5 space-y-4">
-            {/* Product Selection */}
-            <div className="space-y-1">
-              <Label htmlFor="prod-report-select" className="text-sm text-gray-300">اختر المنتج</Label>
-              <select
-                id="prod-report-select"
-                className="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                onChange={(e) => {
-                  const selectedProduct = e.target.value;
-                  if (selectedProduct) {
-                    const productMovements = filteredData.filter(item => item.product === selectedProduct);
-                    // Show product-specific data
-                  }
-                }}
-              >
-                <option value="">اختر منتجاً...</option>
-                {[...new Set(filteredData.map(item => item.product))].map(product => (
-                  <option key={product} value={product}>{product}</option>
-                ))}
-              </select>
-            </div>
+            {!showProductResult ? (
+              <>
+                <div>
+                  <label className="text-sm text-slate-300">اختر المنتج</label>
+                  <select
+                    className="w-full bg-[#161625] border border-[#2b2b3b] rounded-lg px-4 py-2 text-white text-sm focus:border-blue-500 focus:outline-none mt-1 outline-none"
+                    value={selectedProduct}
+                    onChange={(e) => setSelectedProduct(e.target.value)}
+                  >
+                    <option value="">اختر منتجاً...</option>
+                    {[...new Set(movements.map(m => m.productName))].map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Date Range */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="prod-report-from" className="text-sm text-gray-300 mb-1 block">من</Label>
-                <Input
-                  id="prod-report-from"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <Label htmlFor="prod-report-to" className="text-sm text-gray-300 mb-1 block">إلى</Label>
-                <Input
-                  id="prod-report-to"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Preview Section */}
-            <div className="bg-gray-900 rounded-lg p-4 max-h-60 overflow-y-auto">
-              <h4 className="text-white font-semibold mb-3 text-sm">معاينة البيانات</h4>
-              <div className="space-y-2 text-xs">
-                {filteredData.slice(0, 5).map((item) => (
-                  <div key={item.id} className="flex justify-between items-center py-1 border-b border-gray-700">
-                    <span className="text-gray-300">{item.date} - {item.product}</span>
-                    <span className={item.type === "وارد" ? "text-green-400" : "text-red-400"}>
-                      {item.type}: {item.quantity}
-                    </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm text-slate-300">من</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full bg-[#161625] border border-[#2b2b3b] rounded-lg px-4 py-2 text-white text-sm focus:border-blue-500 focus:outline-none mt-1 outline-none"
+                    />
                   </div>
-                ))}
+                  <div>
+                    <label className="text-sm text-slate-300">إلى</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full bg-[#161625] border border-[#2b2b3b] rounded-lg px-4 py-2 text-white text-sm focus:border-blue-500 focus:outline-none mt-1 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleProductReportView}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 h-11"
+                  >
+                    <Printer className="w-4 h-4" /> عرض
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if(!selectedProduct || !startDate || !endDate) return toast({title: "خطأ", description: "املأ جميع الحقول"});
+                      handleExportPDF();
+                    }}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 h-11"
+                  >
+                    <FileText className="w-4 h-4" /> PDF
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if(!selectedProduct || !startDate || !endDate) return toast({title: "خطأ", description: "املأ جميع الحقول"});
+                      handleExportCSV();
+                    }}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 h-11"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" /> CSV
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                {/* Stats Header from test.txt */}
+                <div className="bg-[#161625] rounded-2xl p-6 border border-slate-800/50 grid grid-cols-2 gap-y-6">
+                  <div className="text-right">
+                    <p className="text-slate-500 text-[10px] uppercase font-bold mb-1">كود المنتج</p>
+                    <p className="text-white font-mono font-bold text-lg">{productStats.code}</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-slate-500 text-[10px] uppercase font-bold mb-1">الفترة</p>
+                    <p className="text-white font-bold text-sm">من {new Date(startDate).toLocaleDateString('ar-EG')} إلى {new Date(endDate).toLocaleDateString('ar-EG')}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-slate-500 text-[10px] uppercase font-bold mb-1 text-green-400">سعر الشراء</p>
+                    <p className="text-green-400 font-bold text-lg font-mono">{productStats.buyPrice.toLocaleString()} Fr</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-slate-500 text-[10px] uppercase font-bold mb-1 text-amber-400">سعر البيع</p>
+                    <p className="text-amber-400 font-bold text-lg font-mono">{productStats.sellPrice.toLocaleString()} Fr</p>
+                  </div>
+                </div>
+
+                {/* Summary Boxes from test.txt */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-green-500/10 border border-green-600/30 rounded-2xl p-4 text-center">
+                    <p className="text-green-400 text-xs font-bold">الوارد</p>
+                    <p className="text-3xl font-black text-white font-mono mt-1">{productStats.inQty}</p>
+                    <p className="text-green-300/60 text-[10px] mt-1 font-bold">قيمة: {productStats.inVal.toLocaleString()} Fr</p>
+                  </div>
+                  <div className="bg-amber-500/10 border border-amber-600/30 rounded-2xl p-4 text-center">
+                    <p className="text-amber-400 text-xs font-bold">الصادر</p>
+                    <p className="text-3xl font-black text-white font-mono mt-1">{productStats.outQty}</p>
+                    <p className="text-amber-300/60 text-[10px] mt-1 font-bold">قيمة: {productStats.outVal.toLocaleString()} Fr</p>
+                  </div>
+                </div>
+
+                {/* Movements Table from test.txt */}
+                {productStats.movements.length > 0 ? (
+                  <div className="overflow-x-auto bg-[#161625] rounded-xl border border-slate-800/50">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-[#1e1e2d] text-slate-400">
+                          <th className="p-3 text-right font-bold">التاريخ</th>
+                          <th className="p-3 text-right font-bold">النوع</th>
+                          <th className="p-3 text-right font-bold">الكمية</th>
+                          <th className="p-3 text-right font-bold">السعر</th>
+                          <th className="p-3 text-right font-bold">الإجمالي</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/50">
+                        {productStats.movements.map((m: any, idx: number) => (
+                          <tr key={idx} className={`${idx % 2 === 0 ? 'bg-[#161625]' : 'bg-[#1a1a2e]'} hover:bg-white/5 transition-colors`}>
+                            <td className="p-3 text-slate-300">{new Date(m.createdAt).toLocaleDateString('ar-EG')}</td>
+                            <td className={`p-3 font-bold ${m.type === 'in' ? 'text-green-400' : 'text-amber-400'}`}>
+                              {m.type === 'in' ? '🔼 وارد' : '🔽 صادر'}
+                            </td>
+                            <td className="p-3 text-white font-bold">{m.quantity}</td>
+                            <td className="p-3 text-slate-400 font-mono">{m.price.toLocaleString()}</td>
+                            <td className="p-3 text-white font-bold font-mono">{m.total.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="bg-[#161625] rounded-xl p-6 text-center text-slate-500 text-sm border border-slate-800/50">
+                    لا توجد حركات لهذا المنتج في الفترة المحددة
+                  </div>
+                )}
               </div>
-            </div>
+            ) }
 
-            {/* Action Buttons */}
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => { filterByDateRange(startDate || '', endDate || ''); setProductReportOpen(false); }} 
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
-              >
-                <Printer className="w-4 h-4" /> عرض
-              </Button>
-              <Button 
-                onClick={() => { filterByDateRange(startDate || '', endDate || ''); handleExportPDF(); }} 
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
-              >
-                <FileText className="w-4 h-4" /> PDF
-              </Button>
-              <Button 
-                onClick={() => { filterByDateRange(startDate || '', endDate || ''); handleExportCSV(); }} 
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
-              >
-                <FileSpreadsheet className="w-4 h-4" /> CSV
-              </Button>
-            </div>
-
-            {/* Close Button */}
             <Button 
-              onClick={() => setProductReportOpen(false)} 
-              variant="outline"
-              className="w-full bg-gray-700 hover:bg-gray-600 text-white border-gray-600 py-2 rounded-lg text-sm font-medium transition"
+              onClick={() => {
+                if (showProductResult) setShowProductResult(false);
+                else setProductReportOpen(false);
+              }}
+              className="w-full bg-[#2b2b3b] hover:bg-[#3b3b4b] h-11 rounded-lg text-slate-300 font-bold border border-[#3b3b4b] transition-all"
             >
               إغلاق
             </Button>

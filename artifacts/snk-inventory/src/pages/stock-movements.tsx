@@ -86,7 +86,6 @@ function getStockMovementColumns(
                 : "bg-destructive text-destructive-foreground"
             }`}
           >
-            {type === "in" ? "+" : "-"}
             {quantity}
           </Badge>
         );
