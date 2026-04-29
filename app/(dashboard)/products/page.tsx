@@ -20,7 +20,7 @@ import { useConfirmation } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, FileSpreadsheet, Download, Search, Upload, CloudUpload, FileUp } from "lucide-react";
 
-import { PageLoader } from "@/components/ui/page-loader";
+import { Loader } from "@/components/shared/loader";
 
 type FormState = {
   id?: number;
@@ -269,8 +269,8 @@ export default function ProductsPage() {
     return { variant: "default" as const, text: "متوفر" };
   };
 
-  if (isLoading) return <PageLoader text="جاري تحميل المنتجات..." />;
-  if (!user) return <PageLoader text="جاري التحقق من الهوية..." />;
+  if (isLoading) return <Loader fullScreen text="جاري تحميل المنتجات..." />;
+  if (!user) return <Loader fullScreen text="جاري التحقق من الهوية..." />;
 
   function onEdit(p: Product) {
     openEdit(p);
@@ -388,7 +388,7 @@ export default function ProductsPage() {
                 }
                 setImportOpen(open);
               }}>
-                <DialogContent dir="rtl" className="bg-[#16162b] border border-slate-700/50 max-w-5xl max-h-[90vh] overflow-y-auto">
+                <DialogContent dir="rtl" className="bg-[#111127] border border-slate-700/50 max-w-5xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle className="text-white flex items-center gap-2">
                       <CloudUpload className="size-5 text-primary" />
@@ -563,7 +563,7 @@ export default function ProductsPage() {
         {/* Products Table */}
         <div className="bg-[#111127] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto sidebar-scrollbar">
-            <table className="w-full text-sm min-w-[600px] sm:min-w-0">
+            <table className="w-full text-sm min-w-[700px]">
               <thead>
                 <tr className="bg-[#0d0d20] text-slate-300">
                   <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">الكود</th>
@@ -577,8 +577,8 @@ export default function ProductsPage() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-slate-400">
-                      جاري التحميل...
+                    <td colSpan={6} className="text-center py-8">
+                      <Loader />
                     </td>
                   </tr>
                 ) : productData.length === 0 ? (

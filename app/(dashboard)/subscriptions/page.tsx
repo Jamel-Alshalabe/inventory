@@ -3,23 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/services/api/api";
 import { useApp } from "@/lib/app-context";
 import { customFetch } from "@/services/api/custom-fetch";
-
-// Define Subscription type
-interface Subscription {
-  id: number;
-  user_id: number;
-  user: {
-    id: number;
-    username: string;
-  };
-  start_date: string;
-  end_date: string;
-  subscription_cost: number | string; // May come as string from API
-  is_active: boolean;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-}
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,21 +34,22 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Edit, Eye } from "lucide-react";
 
+// Define Subscription type
 interface Subscription {
   id: number;
   user_id: number;
-  start_date: string;
-  end_date: string;
-  subscription_cost: number;
-  is_active: boolean;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
   user: {
     id: number;
     username: string;
     role: string;
   };
+  start_date: string;
+  end_date: string;
+  subscription_cost: number | string;
+  is_active: boolean;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export default function SubscriptionsPage() {
@@ -85,17 +69,20 @@ export default function SubscriptionsPage() {
   const [isActive, setIsActive] = useState<boolean>(true);
   const [notes, setNotes] = useState<string>("");
 
-  const { data: subscriptions = [] as Subscription[] } = useQuery({
+  const { data: subscriptionsData } = useQuery({
     queryKey: ["subscriptions"],
     queryFn: () => customFetch('/api/subscriptions'),
   });
+  
+  const subscriptions = (subscriptionsData || []) as Subscription[];
 
   const { data: usersResponse = { data: [] } } = useQuery({
     queryKey: ["users"],
     queryFn: () => api.listUsers(),
   });
   
-  const users = Array.isArray(usersResponse) ? usersResponse : usersResponse.data || [];
+  const users = (Array.isArray(usersResponse) ? usersResponse : usersResponse.data || [])
+    .filter((u: any) => u.role === 'admin');
 
   const createMut = useMutation({
     mutationFn: (data: any) => customFetch('/api/subscriptions', {
@@ -116,9 +103,18 @@ export default function SubscriptionsPage() {
       resetForm();
     },
     onError: (error: any) => {
+      // Handle validation errors from backend
+      let description = error.message;
+      if (error.errors && typeof error.errors === 'object') {
+        const firstError = Object.values(error.errors)[0];
+        if (Array.isArray(firstError) && firstError.length > 0) {
+          description = firstError[0];
+        }
+      }
+      
       toast({ 
         title: "فشل إنشاء الاشتراك", 
-        description: error.message,
+        description: description,
         variant: "destructive" 
       });
     },

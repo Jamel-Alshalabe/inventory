@@ -17,6 +17,7 @@ import {
   X,
   CreditCard,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Sidebar } from "./sidebar";
 import { useApp } from "@/lib/app-context";
 import { Button } from "@/components/ui/button";
@@ -68,8 +69,8 @@ export function Layout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth >= 768) {
+      setIsMobile(window.innerWidth < 1024);
+      if (window.innerWidth >= 1024) {
         setSidebarOpen(false);
       }
     };
@@ -107,31 +108,29 @@ export function Layout({ children }: { children: ReactNode }) {
       {/* Mobile backdrop */}
       {isMobile && sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
       
       {/* Right sidebar */}
-      <aside className={`
-        ${isMobile 
-          ? `fixed top-0 right-0 h-screen z-50 transform transition-transform duration-300 ease-in-out ${
-              sidebarOpen ? 'translate-x-0' : 'translate-x-full'
-            }`
-          : 'w-64 sticky top-0 h-screen self-start shrink-0'
-        } 
-        border-l border-border bg-[#0d0d1a] flex flex-col
-      `}>
+      <aside className={cn(
+        "border-l border-border bg-[#0d0d1a] flex flex-col z-50",
+        isMobile 
+          ? "fixed top-0 right-0 h-full w-64 transform transition-transform duration-300 ease-in-out"
+          : "w-64 h-screen sticky top-0 shrink-0 hidden lg:flex",
+        isMobile && (sidebarOpen ? "translate-x-0" : "translate-x-full")
+      )}>
         <div className="px-5 py-5 border-b border-slate-800/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="size-12 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 text-white flex items-center justify-center font-bold text-lg shadow-lg">
               <Building2 className="size-7" />
             </div>
-            <div className="min-w-0">
-              <div className="font-bold truncate text-white text-base" data-testid="text-company-name">
+            <div className="min-w-0 flex-1">
+              <div className="font-bold text-white text-sm leading-tight break-words" data-testid="text-company-name">
                 {currentName}
               </div>
-              <div className="text-xs text-slate-400">نظام إدارة المخزون</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">نظام إدارة المخزون</div>
             </div>
           </div>
           {isMobile && (
@@ -173,13 +172,13 @@ export function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-border bg-card/50 backdrop-blur flex items-center px-4 md:px-6 gap-4">
+        <header className="h-16 border-b border-border bg-card/50 backdrop-blur flex items-center px-4 lg:px-6 gap-4">
           {/* Mobile menu button */}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setSidebarOpen(true)}
-            className="md:hidden text-foreground hover:bg-accent/50"
+            className="lg:hidden text-foreground hover:bg-accent/50"
           >
             <Menu className="size-5" />
           </Button>
@@ -267,7 +266,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </DropdownMenu>
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto overflow-x-hidden custom-scrollbar">{children}</main>
+        <main className="flex-1 p-4 lg:p-6 overflow-y-auto overflow-x-hidden custom-scrollbar">{children}</main>
       </div>
     </div>
   );

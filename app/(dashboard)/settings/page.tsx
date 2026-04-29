@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Combobox } from "@/components/ui/combobox";
+import { CURRENCIES } from "@/lib/currencies";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useApp } from "@/lib/app-context";
 import { api } from "@/services/api/api";
@@ -117,89 +119,13 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2">
               <Label>العملة</Label>
-              <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="اختر العملة" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SDG">الجنيه السوداني (SDG) ج.س</SelectItem>
-                  <SelectItem value="SAR">الريال السعودي (SAR) ر.س</SelectItem>
-                  <SelectItem value="EGP">الجنيه المصري (EGP) ج.م</SelectItem>
-                  <SelectItem value="AED">الدرهم الإماراتي (AED) د.إ</SelectItem>
-                  <SelectItem value="KWD">الدينار الكويتي (KWD) د.ك</SelectItem>
-                  <SelectItem value="QAR">الريال القطري (QAR) ر.ق</SelectItem>
-                  <SelectItem value="BHD">الدينار البحريني (BHD) د.ب</SelectItem>
-                  <SelectItem value="OMR">الريال العماني (OMR) ر.ع</SelectItem>
-                  <SelectItem value="JOD">الدينار الأردني (JOD) د.أ</SelectItem>
-                  <SelectItem value="LBP">الليرة اللبنانية (LBP) ل.ل</SelectItem>
-                  <SelectItem value="IQD">الدينار العراقي (IQD) د.ع</SelectItem>
-                  <SelectItem value="SYP">الليرة السورية (SYP) ل.س</SelectItem>
-                  <SelectItem value="PSG">الشيقل الفلسطيني (PSG) ₪</SelectItem>
-                  <SelectItem value="MAD">الدرهم المغربي (MAD) د.م.</SelectItem>
-                  <SelectItem value="TND">الدينار التونسي (TND) د.ت</SelectItem>
-                  <SelectItem value="DZD">الدينار الجزائري (DZD) د.ج</SelectItem>
-                  <SelectItem value="LYD">الدينار الليبي (LYD) ل.د</SelectItem>
-                  <SelectItem value="NGN">النيرة النيجيرية (NGN) ₦</SelectItem>
-                  <SelectItem value="KES">الشلن الكيني (KES) KSh</SelectItem>
-                  <SelectItem value="UGX">الشلن الأوغندي (UGX) Sh</SelectItem>
-                  <SelectItem value="TZS">الشلن التنزاني (TZS) TSh</SelectItem>
-                  <SelectItem value="BWP">بولا بوتسوانا (BWP) P</SelectItem>
-                  <SelectItem value="ZWL">الدولار الزيمبابوي (ZWL) Z$</SelectItem>
-                  <SelectItem value="ZAR">الراند جنوب أفريقي (ZAR) R</SelectItem>
-                  <SelectItem value="GHS">السيدي الغاني (GHS) ₵</SelectItem>
-                  <SelectItem value="ETB">البر الإثيوبي (ETB) Br</SelectItem>
-                  <SelectItem value="MUR">روبية موريشيوس (MUR) ₨</SelectItem>
-                  <SelectItem value="SCR">روبية سيشل (SCR) ₨</SelectItem>
-                  <SelectItem value="COM">فرنك جزر القمر (COM) Fr</SelectItem>
-                  <SelectItem value="MGA">أرياري مدغشقر (MGA) Ar</SelectItem>
-                  <SelectItem value="XOF">فرنك غرب إفريقيا (XOF) Fr</SelectItem>
-                  <SelectItem value="XAF">فرنك وسط إفريقيا (XAF) Fr</SelectItem>
-                  <SelectItem value="AOA">كوانزا أنجولا (AOA) Kz</SelectItem>
-                  <SelectItem value="MZN">متيكال موزمبيق (MZN) MT</SelectItem>
-                  <SelectItem value="RWF">فرنك رواندا (RWF) Fr</SelectItem>
-                  <SelectItem value="BDI">فرنك بوروندي (BDI) Fr</SelectItem>
-                  <SelectItem value="DJF">فرنك جيبوتي (DJF) Fr</SelectItem>
-                  <SelectItem value="SOS">شلن الصومال (SOS) Sh</SelectItem>
-                  <SelectItem value="ERI">نافكا إريتريا (ERI) Nfk</SelectItem>
-                  <SelectItem value="USD">الدولار الأمريكي (USD) $</SelectItem>
-                  <SelectItem value="EUR">اليورو (EUR) €</SelectItem>
-                  <SelectItem value="GBP">الجنيه الإسترليني (GBP) £</SelectItem>
-                  <SelectItem value="JPY">الين الياباني (JPY) ¥</SelectItem>
-                  <SelectItem value="CNY">اليوان الصيني (CNY) ¥</SelectItem>
-                  <SelectItem value="INR">الروبية الهندية (INR) ₹</SelectItem>
-                  <SelectItem value="AUD">الدولار الأسترالي (AUD) A$</SelectItem>
-                  <SelectItem value="NZD">دولار نيوزيلندا (NZD) NZ$</SelectItem>
-                  <SelectItem value="SGD">دولار سنغافورة (SGD) S$</SelectItem>
-                  <SelectItem value="HKD">دولار هونغ كونغ (HKD) HK$</SelectItem>
-                  <SelectItem value="KRW">الوون الكوري (KRW) ₩</SelectItem>
-                  <SelectItem value="MYR">الرينجيت الماليزي (MYR) RM</SelectItem>
-                  <SelectItem value="THB">البات التايلاندي (THB) ฿</SelectItem>
-                  <SelectItem value="IDR">الروبية الإندونيسية (IDR) Rp</SelectItem>
-                  <SelectItem value="PHP">البيزو الفلبيني (PHP) ₱</SelectItem>
-                  <SelectItem value="VND">الدونج الفيتنامي (VND) ₫</SelectItem>
-                  <SelectItem value="RUB">الروبل الروسي (RUB) ₽</SelectItem>
-                  <SelectItem value="CHF">الفرنك السويسري (CHF)</SelectItem>
-                  <SelectItem value="SEK">الكرونة السويدية (SEK) kr</SelectItem>
-                  <SelectItem value="NOK">الكرونة النرويجية (NOK) kr</SelectItem>
-                  <SelectItem value="DKK">الكرونة الدنماركية (DKK) kr</SelectItem>
-                  <SelectItem value="CZK">الكرونة التشيكية (CZK) Kč</SelectItem>
-                  <SelectItem value="PLN">الزلوتي البولندي (PLN) zł</SelectItem>
-                  <SelectItem value="HUF">الفورينت المجري (HUF) Ft</SelectItem>
-                  <SelectItem value="RON">الليو الروماني (RON) lei</SelectItem>
-                  <SelectItem value="BGN">اللفا البلغاري (BGN) лв</SelectItem>
-                  <SelectItem value="UZS">سوم أوزبكستاني (UZS) so'm</SelectItem>
-                  <SelectItem value="GEL">لاري جورجيا (GEL) ₾</SelectItem>
-                  <SelectItem value="AMD">درام أرمينيا (AMD) ֏</SelectItem>
-                  <SelectItem value="AZN">مانات أذربيجان (AZN) ₼</SelectItem>
-                  <SelectItem value="CAD">الدولار الكندي (CAD) C$</SelectItem>
-                  <SelectItem value="MXN">البيزو المكسيكي (MXN) $</SelectItem>
-                  <SelectItem value="BRL">الريال البرازيلي (BRL) R$</SelectItem>
-                  <SelectItem value="CLP">البيزو التشيلي (CLP) $</SelectItem>
-                  <SelectItem value="COP">البيزو الكولومبي (COP) $</SelectItem>
-                  <SelectItem value="PEN">السول البيروفي (PEN) S/</SelectItem>
-                  <SelectItem value="UYU">البيزو الأوروغواياني (UYU) $U</SelectItem>
-                </SelectContent>
-              </Select>
+              <Combobox
+                options={CURRENCIES}
+                value={currency}
+                onValueChange={setCurrency}
+                placeholder="اختر العملة"
+                searchPlaceholder="بحث عن عملة..."
+              />
             </div>
           </div>
           <div className="pt-4 border-t">

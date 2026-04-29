@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DataTable } from "@/components/ui/data-table";
+import { Loader } from "@/components/shared/loader";
 import { useConfirmation } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Printer, Eye, X } from "lucide-react";
@@ -133,7 +134,7 @@ export default function InvoicesPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [view, setView] = useState<Invoice | null>(null);
 
-  const { data: invoicesResponse = [] } = useQuery({
+  const { data: invoicesResponse = [], isLoading: isInvoicesLoading } = useQuery({
     queryKey: ["invoices", selectedWarehouseId],
     queryFn: () => customFetch<Invoice[]>(`/api/invoices${warehouseQuery(selectedWarehouseId)}`),
   });
@@ -141,7 +142,7 @@ export default function InvoicesPage() {
   // Extract invoices array from response
   const invoices = Array.isArray(invoicesResponse) ? invoicesResponse : ((invoicesResponse as any)?.data || []);
 
-  const { data: productsResponse = [] } = useQuery({
+  const { data: productsResponse = [], isLoading: isProductsLoading } = useQuery({
     queryKey: ["products", selectedWarehouseId, ""],
     queryFn: () => customFetch<Product[]>(`/api/products${warehouseQuery(selectedWarehouseId)}`),
   });
@@ -393,7 +394,7 @@ export default function InvoicesPage() {
       </style></head><body>
       <div class="page">
         <div class="invoice-header">
-          <h1>${settings.companyName ?? "شركة سنك"}</h1>
+          <h2>${settings.companyName ?? ""}</h2>
           <p>لإدارة المخزون وقطع غيار السيارات</p>
           ${settings.companyPhone ? `<p>هاتف: ${settings.companyPhone}</p>` : ''}
         </div>
@@ -591,6 +592,7 @@ export default function InvoicesPage() {
           searchKey="customerName"
           searchPlaceholder="بحث بالعميل أو رقم الفاتورة..."
           emptyMessage="لا توجد فواتير مسجلة بعد"
+          isLoading={isInvoicesLoading}
         />
       </Card>
       

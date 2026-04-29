@@ -16,10 +16,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Printer, FileSpreadsheet, FileText, Zap, Calendar, Layers, Clock, CalendarDays, Search } from "lucide-react";
+import { Printer, FileSpreadsheet, FileText, Zap, Calendar, Layers, Clock, CalendarDays, Search, Check, ChevronsUpDown } from "lucide-react";
 import { useApp, warehouseQuery } from "@/lib/app-context";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
+import { Combobox } from "@/components/ui/combobox";
 
 interface ReportData {
   id: number;
@@ -41,115 +42,119 @@ const printStyles = `
   @media print {
     @page {
       size: A4;
-      margin: 0;
+      margin: 1.5cm;
     }
-    body * {
-      visibility: hidden !important;
-    }
-    .print-only-section, .print-only-section * {
-      visibility: visible !important;
+    body > :not(.print-only-section) {
+      display: none !important;
     }
     .print-only-section {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      background: white !important;
       display: block !important;
-      padding: 1cm !important;
-      z-index: 9999 !important;
+      background: white !important;
+      width: 100% !important;
+      color: #333 !important;
+      direction: rtl !important;
     }
     body {
       background: white !important;
-      color: black !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
-      font-family: 'Tahoma', sans-serif;
     }
+    
     .print-header {
-      background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%) !important;
-      color: white !important;
-      padding: 30px !important;
       text-align: center !important;
-      border-radius: 8px !important;
-      margin-bottom: 30px !important;
-      -webkit-print-color-adjust: exact !important;
+      margin-bottom: 40px !important;
+      border-bottom: 1px solid #eee !important;
+      padding-bottom: 20px !important;
     }
     .print-header h2 {
-      font-size: 28px !important;
-      margin-bottom: 10px !important;
-      color: white !important;
+      font-size: 24px !important;
+      color: #1a1a1a !important;
+      margin: 0 0 10px 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 10px !important;
     }
-    .print-header p {
+    .print-header .company-name {
       font-size: 14px !important;
-      opacity: 0.9 !important;
-      color: white !important;
+      color: #666 !important;
+      margin-bottom: 5px !important;
     }
+    .print-header .report-period {
+      font-size: 12px !important;
+      color: #888 !important;
+    }
+
     .print-summary {
       display: grid !important;
       grid-template-columns: repeat(4, 1fr) !important;
-      gap: 15px !important;
-      margin-bottom: 30px !important;
+      gap: 20px !important;
+      margin-bottom: 40px !important;
+      text-align: center !important;
     }
     .summary-box {
-      padding: 15px !important;
-      border-radius: 8px !important;
-      text-align: center !important;
-      color: white !important;
-      -webkit-print-color-adjust: exact !important;
+      padding: 10px !important;
     }
-    .bg-profit { background-color: #ef4444 !important; }
-    .bg-remaining { background-color: #3b82f6 !important; }
-    .bg-export { background-color: #f97316 !important; }
-    .bg-import { background-color: #22c55e !important; }
-    
-    .summary-box p:first-child {
+    .summary-box .label {
       font-size: 11px !important;
-      margin-bottom: 5px !important;
-      font-weight: bold !important;
-      color: white !important;
+      color: #888 !important;
+      margin-bottom: 8px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 5px !important;
     }
-    .summary-box p:last-child {
-      font-size: 20px !important;
-      font-weight: 800 !important;
-      color: white !important;
+    .summary-box .value {
+      font-size: 18px !important;
+      font-weight: 700 !important;
+      color: #1a1a1a !important;
+      margin-bottom: 4px !important;
     }
-    
-    table {
+    .summary-box .unit {
+      font-size: 10px !important;
+      color: #999 !important;
+    }
+
+    .print-table {
       width: 100% !important;
       border-collapse: collapse !important;
     }
-    th {
-      background-color: #1e3a8a !important;
-      color: white !important;
+    .print-table th {
+      border-bottom: 2px solid #eee !important;
       padding: 12px 8px !important;
       text-align: right !important;
       font-size: 12px !important;
-      border: 1px solid #ddd !important;
-      -webkit-print-color-adjust: exact !important;
+      color: #999 !important;
+      font-weight: 500 !important;
     }
-    td {
-      padding: 10px 8px !important;
-      border: 1px solid #ddd !important;
+    .print-table td {
+      padding: 12px 8px !important;
+      border-bottom: 1px solid #f5f5f5 !important;
       font-size: 11px !important;
-      text-align: right !important;
-      color: black !important;
+      color: #444 !important;
     }
-    tr:nth-child(even) {
-      background-color: #f8fafc !important;
-      -webkit-print-color-adjust: exact !important;
+    .print-table tr:last-child td {
+      border-bottom: none !important;
     }
-    .badge-out { background-color: #f97316 !important; color: white !important; padding: 2px 6px !important; border-radius: 4px !important; font-size: 10px !important; -webkit-print-color-adjust: exact !important; }
-    .badge-in { background-color: #22c55e !important; color: white !important; padding: 2px 6px !important; border-radius: 4px !important; font-size: 10px !important; -webkit-print-color-adjust: exact !important; }
-    
-    .print-footer {
-      margin-top: 40px !important;
-      text-align: center !important;
-      border-top: 1px solid #eee !important;
-      padding-top: 20px !important;
+    .type-badge {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
       font-size: 10px !important;
-      color: #666 !important;
+    }
+    .type-in { color: #22c55e !important; }
+    .type-out { color: #3b82f6 !important; }
+
+    .print-footer {
+      margin-top: 50px !important;
+      padding-top: 20px !important;
+      border-top: 2px solid #3b82f6 !important;
+      text-align: center !important;
+      font-size: 10px !important;
+      color: #999 !important;
+    }
+    .print-footer p {
+      margin: 4px 0 !important;
     }
   }
 `;
@@ -172,15 +177,39 @@ export default function ReportsPage() {
     movements: [] as any[]
   });
   const [printOptionsOpen, setPrintOptionsOpen] = useState(false);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [filteredData, setFilteredData] = useState<ReportData[]>([]);
+
+  // Inject print styles
+  useEffect(() => {
+    const styleTag = document.createElement("style");
+    styleTag.innerHTML = printStyles;
+    document.head.appendChild(styleTag);
+    return () => {
+      document.head.removeChild(styleTag);
+    };
+  }, []);
 
   // Fetch movements from API
   const { data: movementsResponse = [], isLoading } = useQuery({
     queryKey: ["movements", selectedWarehouseId],
     queryFn: () => customFetch<Movement[]>(`/api/movements${warehouseQuery(selectedWarehouseId)}`),
   });
+
+  // Fetch all products from API for the searchable list
+  const { data: productsResponse = [] } = useQuery({
+    queryKey: ["products-list", selectedWarehouseId],
+    queryFn: () => customFetch<any>(`/api/products${warehouseQuery(selectedWarehouseId)}`),
+  });
+
+  const products = Array.isArray(productsResponse) 
+    ? productsResponse 
+    : (Array.isArray((productsResponse as any)?.data) ? (productsResponse as any)?.data : []);
 
   // Extract movements array from response and filter by warehouse
   const movements = Array.isArray(movementsResponse) 
@@ -194,7 +223,7 @@ export default function ReportsPage() {
   const filterByDateRange = (start: string, end: string) => {
     if (!movements.length) return;
     
-    const reportData = movements.map((movement: Movement) => ({
+    const reportData = movements.map((movement: any) => ({
       id: movement.id,
       date: movement.createdAt.split('T')[0],
       type: movement.type === 'out' ? 'صادر' : 'وارد' as const,
@@ -266,10 +295,10 @@ export default function ReportsPage() {
     filterByDateRange("", "");
   };
 
-  // Initialize filtered data with all data - memoized to prevent infinite loop
+  // Initialize filtered data with default date range (last month)
   useEffect(() => {
-    if (movements.length > 0 && filteredData.length === 0 && !startDate && !endDate) {
-      filterByDateRange("", "");
+    if (movements.length > 0) {
+      filterByDateRange(startDate, endDate);
     }
   }, [movements]);
 
@@ -337,14 +366,12 @@ export default function ReportsPage() {
   };
 
   const handleDirectPrint = () => {
-    window.print();
+    handleExportPDF();
     setPrintOptionsOpen(false);
-    toast({ title: "جاري الطباعة..." });
   };
 
   const handleSavePDF = () => {
-    // Placeholder for PDF generation
-    toast({ title: "جاري حفظ ملف PDF..." });
+    handleExportPDF();
     setPrintOptionsOpen(false);
   };
 
@@ -388,8 +415,185 @@ export default function ReportsPage() {
   };
 
   const handleExportPDF = () => {
-    // For PDF export, we'll use window.print() with print CSS
-    window.print();
+    // Determine the actual date range for the report
+    let from = startDate;
+    let to = endDate;
+
+    // If dates are not manually selected, use the range from the filtered data
+    if (!from || !to) {
+      const dates = filteredData.map(d => new Date(d.date).getTime());
+      if (dates.length > 0) {
+        if (!from) from = new Date(Math.min(...dates)).toISOString().split('T')[0];
+        if (!to) to = new Date(Math.max(...dates)).toISOString().split('T')[0];
+      } else {
+        from = from || "بداية السجل";
+        to = to || "اليوم";
+      }
+    }
+
+    const fmtDateAr = (dateStr: string) => {
+      if (dateStr === "بداية السجل" || dateStr === "اليوم") return dateStr;
+      return new Date(dateStr).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    };
+
+    const displayFrom = fmtDateAr(from);
+    const displayTo = fmtDateAr(to);
+    
+    const totalIn = totalImport;
+    const totalOut = totalExport;
+    const remaining = remainingQuantity;
+    const profit = profitLoss;
+    const fmt = (val: number) => val.toLocaleString('ar-EG');
+    const cs = () => settings.currency || "ج.م";
+
+    const printWindow = window.open('', '', 'height=900,width=1200');
+    if (!printWindow) return;
+
+    let html = `
+    <html dir="rtl">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width">
+      <title>تقرير حركة المخزون - ${displayFrom} إلى ${displayTo}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Noto Kufi Arabic', Tahoma, sans-serif; }
+        body { color: #000; margin: 15px; background: #fff; line-height: 1.6; }
+        
+        .header { 
+          background: linear-gradient(135deg, #0f3490 0%, #1a56db 100%); 
+          color: white; 
+          text-align: center; 
+          padding: 25px; 
+          border-radius: 8px; 
+          margin-bottom: 20px; 
+          box-shadow: 0 4px 12px rgba(15, 52, 144, 0.3); 
+          text-shadow: 1px 1px 2px rgba(0,0,0,0.2); 
+        }
+        .header h1 { font-size: 28px; margin: 0 0 8px 0; letter-spacing: 1px; }
+        .header p { margin: 3px 0; font-size: 12px; opacity: 0.95; }
+        
+        .stats { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .stat-box { 
+          border-radius: 8px; 
+          padding: 15px; 
+          text-align: center; 
+          color: white; 
+          font-weight: bold; 
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+          border: 2px solid rgba(255,255,255,0.3); 
+        }
+        .stat-in { background: linear-gradient(135deg, #22c55e, #16a34a); }
+        .stat-out { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .stat-remaining { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+        .stat-profit { background: linear-gradient(135deg, ${profit >= 0 ? '#10b981, #059669' : '#ef4444, #dc2626'}); }
+        
+        .stat-label { font-size: 11px; opacity: 0.9; margin-bottom: 8px; }
+        .stat-value { font-size: 20px; font-family: monospace; margin-bottom: 5px; }
+        .stat-unit { font-size: 10px; opacity: 0.8; }
+        
+        table { 
+          width: 100%; 
+          border-collapse: collapse; 
+          margin-top: 15px; 
+          font-size: 12px; 
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+          border-radius: 8px; 
+          overflow: hidden; 
+        }
+        thead { background: linear-gradient(90deg, #0f3490, #1a56db); color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); font-weight: bold; }
+        th { padding: 14px; text-align: right; border: none; }
+        td { padding: 12px; text-align: right; border: none; border-bottom: 1px solid #e5e7eb; }
+        
+        tbody tr:nth-child(even) { background: #f5f9ff; }
+        tbody tr:nth-child(odd) { background: #ffffff; }
+        
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; }
+        .badge-in { background: #22c55e; }
+        .badge-out { background: #f59e0b; }
+        
+        .footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 2px solid #0284c7; font-size: 10px; color: #666; }
+        @media print { body { margin: 10mm; padding: 0; } * { box-shadow: none !important; } }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>📊 تقرير حركة المخزون</h1>
+        <p>${settings.companyName || 'شركة سنك لقطع غيار السيارات'}</p>
+        <p>الفترة: من ${displayFrom} إلى ${displayTo}</p>
+      </div>
+      
+      <div class="stats">
+        <div class="stat-box stat-in">
+          <div class="stat-label">🔼 إجمالي الوارد</div>
+          <div class="stat-value">${fmt(totalIn)}</div>
+          <div class="stat-unit">${cs()}</div>
+        </div>
+        <div class="stat-box stat-out">
+          <div class="stat-label">🔽 إجمالي الصادر</div>
+          <div class="stat-value">${fmt(totalOut)}</div>
+          <div class="stat-unit">${cs()}</div>
+        </div>
+        <div class="stat-box stat-remaining">
+          <div class="stat-label">📦 المتبقي</div>
+          <div class="stat-value">${fmt(remaining)}</div>
+          <div class="stat-unit">وحدة</div>
+        </div>
+        <div class="stat-box stat-profit">
+          <div class="stat-label">💰 الربح/الخسارة</div>
+          <div class="stat-value">${fmt(profit)}</div>
+          <div class="stat-unit">${cs()}</div>
+        </div>
+      </div>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>التاريخ</th>
+            <th>النوع</th>
+            <th>المنتج</th>
+            <th>الكمية</th>
+            <th>السعر</th>
+            <th>الإجمالي</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredData.map(item => `
+            <tr>
+              <td>${item.date}</td>
+              <td>
+                <span class="badge ${item.type === 'وارد' ? 'badge-in' : 'badge-out'}">
+                  ${item.type}
+                </span>
+              </td>
+              <td style="font-weight:bold">${item.product}</td>
+              <td style="font-weight:bold">${item.quantity}</td>
+              <td>${fmt(item.price)}</td>
+              <td style="font-weight:bold;color:#0f3490">${fmt(item.total)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      
+      <div class="footer">
+        <p>تم استخراج التقرير في: ${new Date().toLocaleString('ar-EG')}</p>
+        <p>© ${settings.companyName || 'شركة سنك لقطع غيار السيارات'}</p>
+      </div>
+      
+      <script>
+        window.onload = () => {
+          setTimeout(() => {
+            window.print();
+            window.close();
+          }, 500);
+        };
+      </script>
+    </body>
+    </html>`;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
     toast({ title: "جاري طباعة التقرير..." });
   };
 
@@ -624,30 +828,42 @@ export default function ReportsPage() {
       <div className="hidden print:block print-only-section">
         <div className="print-header">
           <h2>📊 تقرير حركة المخزون</h2>
-          <p className="font-bold text-lg mb-1">{settings.companyName || 'شركة سنك'}</p>
-          <p>الفترة: من {startDate || 'بداية السجل'} إلى {endDate || 'اليوم'}</p>
+          <p className="company-name">{settings.companyName || 'شركة سنك لقطع غيار السيارات'}</p>
+          <p className="report-period">الفترة: من {startDate || 'بداية السجل'} إلى {endDate || 'اليوم'}</p>
         </div>
 
         <div className="print-summary">
-          <div className="summary-box bg-profit">
-            <p>💰 الربح/الخسارة</p>
-            <p>{profitLoss.toLocaleString('ar-EG')} Fr</p>
+          <div className="summary-box">
+            <div className="label">
+              <Zap className="size-3" /> إجمالي الوارد
+            </div>
+            <div className="value">{totalImport.toLocaleString('ar-EG')}</div>
+            <div className="unit">Fr</div>
           </div>
-          <div className="summary-box bg-remaining">
-            <p>📦 المتبقي</p>
-            <p>{remainingQuantity.toLocaleString('ar-EG')} وحدة</p>
+          <div className="summary-box">
+            <div className="label">
+              <Layers className="size-3" /> إجمالي الصادر
+            </div>
+            <div className="value">{totalExport.toLocaleString('ar-EG')}</div>
+            <div className="unit">Fr</div>
           </div>
-          <div className="summary-box bg-export">
-            <p>📤 إجمالي الصادر</p>
-            <p>{totalExport.toLocaleString('ar-EG')} Fr</p>
+          <div className="summary-box">
+            <div className="label">
+              <Calendar className="size-3" /> المتبقي
+            </div>
+            <div className="value">{remainingQuantity.toLocaleString('ar-EG')}</div>
+            <div className="unit">وحدة</div>
           </div>
-          <div className="summary-box bg-import">
-            <p>📥 إجمالي الوارد</p>
-            <p>{totalImport.toLocaleString('ar-EG')} Fr</p>
+          <div className="summary-box">
+            <div className="label">
+              <Clock className="size-3" /> الربح/الخسارة
+            </div>
+            <div className="value">{profitLoss.toLocaleString('ar-EG')}{profitLoss < 0 ? '-' : ''}</div>
+            <div className="unit">Fr</div>
           </div>
         </div>
 
-        <table>
+        <table className="print-table">
           <thead>
             <tr>
               <th>التاريخ</th>
@@ -663,28 +879,29 @@ export default function ReportsPage() {
               <tr key={item.id}>
                 <td>{item.date}</td>
                 <td>
-                  <span className={item.type === "صادر" ? "badge-out" : "badge-in"}>
-                    {item.type}
+                  <span className={`type-badge ${item.type === "صادر" ? "type-out" : "type-in"}`}>
+                    {item.type === "صادر" ? "▼ صادر" : "▲ وارد"}
                   </span>
                 </td>
-                <td className="font-bold">{item.product}</td>
-                <td>{item.quantity}</td>
+                <td style={{ fontWeight: 'bold' }}>{item.product}</td>
+                <td style={{ fontWeight: 'bold' }}>{item.quantity}</td>
                 <td>{item.price.toLocaleString('ar-EG')}</td>
-                <td className="font-bold">{item.total.toLocaleString('ar-EG')}</td>
+                <td style={{ fontWeight: 'bold', color: '#1a1a1a' }}>{item.total.toLocaleString('ar-EG')}</td>
               </tr>
             ))}
           </tbody>
         </table>
 
         <div className="print-footer">
-          <p>تم استخراج هذا التقرير بتاريخ {new Date().toLocaleString('ar-EG')}</p>
-          <p>جميع الحقوق محفوظة © {settings.companyName || 'شركة سنك'}</p>
+          <p>تم طباعة هذا التقرير من نظام إدارة المخزون</p>
+          <p>{new Date().toLocaleDateString('ar-EG')} {new Date().toLocaleTimeString('ar-EG')}</p>
+          <p>© {settings.companyName || 'شركة سنك لقطع غيار السيارات'}</p>
         </div>
       </div>
 
       {/* Quick Report Dialog - Matching test.txt design */}
       <Dialog open={quickReportOpen} onOpenChange={setQuickReportOpen}>
-        <DialogContent dir="rtl" className="sm:max-w-md bg-gray-800 border-gray-700 text-white p-0 overflow-hidden">
+        <DialogContent dir="rtl" className="sm:max-w-md bg-[#111127] border-gray-700 text-white p-0 overflow-hidden">
           <DialogHeader className="p-5 border-b border-gray-700">
             <DialogTitle className="flex items-center justify-between text-white text-lg font-bold">
               <span className="flex items-center gap-2">
@@ -789,8 +1006,8 @@ export default function ReportsPage() {
           setSelectedProduct("");
         }
       }}>
-        <DialogContent dir="rtl" className="sm:max-w-2xl bg-[#1e1e2d] border-[#2b2b3b] text-white p-0 overflow-hidden shadow-2xl rounded-2xl">
-          <div className="flex items-center justify-between p-5 border-b border-[#2b2b3b] sticky top-0 z-10 bg-[#1e1e2d]">
+        <DialogContent dir="rtl" className="sm:max-w-2xl bg-[#111127] border-[#2b2b3b] text-white p-0 overflow-hidden shadow-2xl rounded-2xl">
+          <div className="flex items-center justify-between p-5 border-b border-[#2b2b3b] sticky top-0 z-10 bg-[#111127]">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               📊 {showProductResult ? `تقرير ${selectedProduct}` : "تقرير المنتج"}
             </h3>
@@ -800,22 +1017,23 @@ export default function ReportsPage() {
             {!showProductResult ? (
               <>
                 <div>
-                  <label className="text-sm text-slate-300">اختر المنتج</label>
-                  <select
-                    className="w-full bg-[#161625] border border-[#2b2b3b] rounded-lg px-4 py-2 text-white text-sm focus:border-blue-500 focus:outline-none mt-1 outline-none"
+                  <label className="text-sm text-slate-300 mb-1 block">اختر المنتج</label>
+                  <Combobox
+                    options={products.map((p: any) => ({
+                      label: p.name,
+                      value: p.name
+                    }))}
                     value={selectedProduct}
-                    onChange={(e) => setSelectedProduct(e.target.value)}
-                  >
-                    <option value="">اختر منتجاً...</option>
-                    {[...new Set(movements.map(m => m.productName))].map(name => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                  </select>
+                    onSelect={setSelectedProduct}
+                    placeholder="ابحث عن منتج..."
+                    emptyText="لا يوجد منتجات"
+                    className="w-full bg-[#111127] border border-[#2b2b3b] text-white"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-sm text-slate-300">من</label>
+                    <label className="text-sm text-white">من</label>
                     <input
                       type="date"
                       value={startDate}
@@ -824,7 +1042,7 @@ export default function ReportsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm text-slate-300">إلى</label>
+                    <label className="text-sm text-white">إلى</label>
                     <input
                       type="date"
                       value={endDate}
@@ -926,7 +1144,7 @@ export default function ReportsPage() {
                     </table>
                   </div>
                 ) : (
-                  <div className="bg-[#161625] rounded-xl p-6 text-center text-slate-500 text-sm border border-slate-800/50">
+                  <div className="bg-[#111127] rounded-xl p-6 text-center text-slate-500 text-sm border border-slate-800/50">
                     لا توجد حركات لهذا المنتج في الفترة المحددة
                   </div>
                 )}
@@ -938,7 +1156,7 @@ export default function ReportsPage() {
                 if (showProductResult) setShowProductResult(false);
                 else setProductReportOpen(false);
               }}
-              className="w-full bg-[#2b2b3b] hover:bg-[#3b3b4b] h-11 rounded-lg text-slate-300 font-bold border border-[#3b3b4b] transition-all"
+              className="w-full bg-[#111127] hover:bg-[#3b3b4b] h-11 rounded-lg text-slate-300 font-bold border border-[#3b3b4b] transition-all"
             >
               إغلاق
             </Button>

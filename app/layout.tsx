@@ -16,6 +16,7 @@ import SettingsPage from "@/app/(dashboard)/settings/page";
 import LogsPage from "@/app/(dashboard)/logs/page";
 import ReportsPage from "@/app/(dashboard)/reports/page";
 import NotFound from "@/app/not-found";
+import { Loader } from "@/components/shared/loader";
 import "@/styles/index.css";
 
 const queryClient = new QueryClient({
@@ -136,8 +137,8 @@ function Gate() {
   const { user, loading } = useApp();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
-        جاري التحميل...
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader fullScreen />
       </div>
     );
   }

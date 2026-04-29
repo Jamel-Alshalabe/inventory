@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useApp, warehouseQuery } from "@/lib/app-context";
 import { api, fmtDate, fmtMoney } from "@/services/api/api";
 import { dashboardService } from "@/services/dashboard-service";
+import { Loader } from "@/components/shared/loader";
 import { Card } from "@/components/ui/card";
 import {
   Package,
@@ -115,10 +116,7 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#050510]">
-        <div className="relative">
-          <div className="size-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-          <div className="absolute inset-0 size-16 border-4 border-blue-400/10 rounded-full blur-sm" />
-        </div>
+        <Loader />
       </div>
     );
   }
@@ -137,20 +135,20 @@ export default function DashboardPage() {
   const displayProfit = d.profit || (d.totalSales * 0.2);
 
   return (
-    <div className="min-h-screen space-y-8 p-4 sm:p-8 bg-[#050510] text-slate-200 selection:bg-blue-500/30">
+    <div className="min-h-screen space-y-6 p-4 sm:p-8 bg-[#050510] text-slate-200 selection:bg-blue-500/30">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-extrabold text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-slate-500">
+          <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-slate-500">
             لوحة التحكم
           </h1>
           <p className="text-slate-400 text-sm mt-2 flex items-center gap-2">
             <span className="size-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-            نظرة عامة على نشاط المخزن المباشر
+            نظرة عامة على نشاط المخزن 
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
         <StatCard 
           label="إجمالي المنتجات" 
           value={d.totalProducts.toLocaleString("ar-EG")} 
@@ -209,7 +207,7 @@ export default function DashboardPage() {
         /> */}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <div className="flex items-center gap-4 p-6 bg-gradient-to-br from-emerald-500/10 to-emerald-900/5 border border-emerald-500/20 rounded-3xl backdrop-blur-xl group">
           <div className="size-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
             <TrendingUp className="text-emerald-400 size-6" />
@@ -237,10 +235,7 @@ export default function DashboardPage() {
               <h2 className="font-bold text-xl sm:text-2xl text-white">تحليل الحركات</h2>
               <p className="text-sm text-slate-400 mt-1">تطور الوارد والصادر خلال الفترة الأخيرة</p>
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-800/50 px-4 py-2 rounded-2xl border border-slate-700/50 w-fit">
-              <span className="size-2 bg-emerald-500 rounded-full animate-pulse" />
-              مباشر
-            </div>
+           
           </div>
           {!data.dailyMovements || data.dailyMovements.length === 0 ? (
             <div className="text-sm text-slate-400 py-12 text-center">لا توجد بيانات كافية</div>
@@ -361,10 +356,10 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="bg-[#16162b] rounded-xl border border-slate-700/50 p-5">
+      <div className="bg-[#16162b] rounded-xl border border-slate-700/50 p-4 sm:p-5">
         <h3 className="text-lg font-bold text-white mb-4">آخر الحركات (تفصيلي)</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto sidebar-scrollbar">
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="bg-[#1a1a2e] text-slate-300">
                 <th className="px-4 py-3 text-right font-medium">التاريخ</th>

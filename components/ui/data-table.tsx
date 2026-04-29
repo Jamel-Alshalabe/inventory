@@ -35,6 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { Loader } from "@/components/shared/loader"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -43,6 +44,7 @@ interface DataTableProps<TData, TValue> {
   searchPlaceholder?: string
   className?: string
   emptyMessage?: string
+  isLoading?: boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -52,6 +54,7 @@ export function DataTable<TData, TValue>({
   searchPlaceholder = "بحث...",
   className,
   emptyMessage = "لا توجد بيانات",
+  isLoading = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -129,8 +132,8 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Table */}
-      <div className="rounded-md border border-border bg-card overflow-x-auto">
-        <Table className="min-w-[600px]">
+      <div className="rounded-md border border-border bg-card overflow-x-auto sidebar-scrollbar">
+        <Table className="min-w-[750px]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -151,7 +154,16 @@ export function DataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-32 text-center"
+                >
+                  <Loader />
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}

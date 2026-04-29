@@ -8,6 +8,9 @@ import {
   type ReactNode,
 } from "react";
 import { api, type AuthUser, type Warehouse, type Role } from "@/services/api/api";
+
+// Re-export types for consumers
+export type { AuthUser, Warehouse, Role };
 import { setBaseUrl } from "@/services/api/custom-fetch";
 
 // Base URL is now handled by Vite proxy and configured in custom-fetch.ts via VITE_API_URL env var
@@ -23,7 +26,7 @@ type AppContextValue = {
   refreshWarehouses: () => Promise<void>;
   refreshSettings: () => Promise<void>;
   updateSettings: (newSettings: Record<string, string>) => Promise<void>;
-  login: (u: string, p: string) => Promise<void>;
+  login: (u: string, p: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
 };
 
@@ -67,6 +70,11 @@ const clearStoredSession = () => {
   localStorage.removeItem(STORAGE_KEYS.legacyToken);
 };
 
+const clearStoredUserOnly = () => {
+  localStorage.removeItem(STORAGE_KEYS.user);
+  localStorage.removeItem(STORAGE_KEYS.sessionTime);
+};
+
 // Helper functions for localStorage
 const saveUserToStorage = (user: AuthUser | null, token?: string) => {
   if (user) {
@@ -108,22 +116,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const userResponse = await api.getMe();
 
-      if (userResponse.user) {
+      // The backend returns `UserResource` directly for /auth/me, but some clients
+      // may wrap it as `{ user: ... }`. Laravel JsonResource may also wrap
+      // payloads as `{ data: ... }`. Support all shapes.
+      const rawUser = (() => {
+        if (!userResponse || typeof userResponse !== "object") return null;
+
+        // { user: { data: {...} } }
+        if ("user" in (userResponse as any)) {
+          const u = (userResponse as any).user;
+          if (u && typeof u === "object" && "data" in u) return (u as any).data;
+          return u;
+        }
+
+        // { data: {...} }
+        if ("data" in (userResponse as any)) {
+          return (userResponse as any).data;
+        }
+
+        // {...}
+        return userResponse as any;
+      })();
+
+      if (rawUser && typeof rawUser === "object" && "id" in (rawUser as any)) {
         const authUser: AuthUser = {
-          id: userResponse.user.id,
-          username: userResponse.user.username,
-          role: userResponse.user.role as Role,
-          permissions: (userResponse.user as any).permissions || [],
-          assignedWarehouseId: userResponse.user.assignedWarehouseId ?? null,
-          assignedWarehouseName: userResponse.user.assignedWarehouseName ?? null,
-          maxWarehouses: (userResponse.user as any).max_warehouses || 1,
+          id: (rawUser as any).id,
+          username: (rawUser as any).username,
+          role: (rawUser as any).role as Role,
+          permissions: (rawUser as any).permissions || [],
+          assignedWarehouseId: (rawUser as any).assignedWarehouseId ?? null,
+          assignedWarehouseName: (rawUser as any).assignedWarehouseName ?? null,
+          maxWarehouses: (rawUser as any).max_warehouses || 1,
         };
         setUser(authUser);
         const existingToken = getStoredToken();
         saveUserToStorage(authUser, existingToken || undefined);
       } else {
+        const storedUser = loadUserFromStorage();
+        const storedToken = getStoredToken();
+
+        if (storedUser && storedToken) {
+          setUser(storedUser);
+          saveUserToStorage(storedUser, storedToken || undefined);
+          return;
+        }
+
         setUser(null);
-        saveUserToStorage(null);
+        clearStoredUserOnly();
       }
     } catch (error) {
       
@@ -161,7 +200,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         saveUserToStorage(storedUser, storedToken || undefined);
       } else {
         setUser(null);
-        saveUserToStorage(null);
+        clearStoredUserOnly();
       }
     }
   }, []);
@@ -194,13 +233,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (username: string, password: string) => {
+    async (username: string, password: string): Promise<AuthUser> => {
       const response = await api.login({ username, password });
       const authUser: AuthUser = {
         id: response.user.id,
         username: response.user.username,
         role: response.user.role as Role,
-        permissions: (response.user as any).permissions || [], // Copy permissions from API response
+        permissions: (response.user as any).permissions || [],
         assignedWarehouseId: response.user.assignedWarehouseId ?? null,
         assignedWarehouseName: response.user.assignedWarehouseName ?? null,
         maxWarehouses: (response.user as any).max_warehouses || 1,
@@ -210,6 +249,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveUserToStorage(authUser, (response as any).token);
       
       await Promise.all([refreshWarehouses(), refreshSettings()]);
+      return authUser;
     },
     [refreshWarehouses, refreshSettings],
   );
