@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import { SysUserRole } from "@/lib/api-client-react/dist";
 
 interface NavItem {
   href: string;
@@ -97,7 +98,6 @@ export function Layout({ children }: { children: ReactNode }) {
 
   const lockedWarehouse = user.role === "user" && !!user.assignedWarehouseId;
   const currentName = settings.companyName || "company name";
-  
   // Extract warehouses data properly (handle both array and { data: [] } structures)
   const warehousesArray = Array.isArray(warehouses) ? warehouses : (warehouses?.data || []);
   
@@ -128,7 +128,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
             <div className="min-w-0 flex-1">
               <div className="font-bold text-white text-sm leading-tight break-words" data-testid="text-company-name">
-                {currentName}
+                {user?.role === "super_admin" ? 'لوحة تحكم النظام' : currentName}
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5">نظام إدارة المخزون</div>
             </div>

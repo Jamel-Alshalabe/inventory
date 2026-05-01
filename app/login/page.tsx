@@ -31,9 +31,9 @@ const ROUTES_BY_PRIORITY = [
 function getFirstAccessibleRoute(user: UserWithPermissions | null): string {
   if (!user) return "/login";
 
-  // Super admin can access subscriptions
+  // Super admin can access users
   if (user.role === "super_admin") {
-    return "/subscriptions";
+    return "/users";
   }
 
   const userPermissions = user.permissions || [];
