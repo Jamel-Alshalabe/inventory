@@ -1,5 +1,5 @@
 import * as apiMethods from "../../lib/old_lib/api-client-react/src/generated/api";
-import type { Dashboard, Product, Warehouse, SysUser, SysUserRole } from "../../lib/old_lib/api-client-react/src/generated/api.schemas";
+import type { Dashboard, Product, Warehouse, SysUser, SysUserRole, Invoice } from "../../lib/old_lib/api-client-react/src/generated/api.schemas";
 
 export const api = {
   ...apiMethods,
@@ -7,10 +7,12 @@ export const api = {
 
 export const fmtDate = (date: string) => {
   if (!date) return "";
-  return new Date(date).toLocaleDateString("ar-EG", {
+  return new Date(date).toLocaleString("ar-EG", {
     year: "numeric",
-    month: "long",
+    month: "numeric",
     day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 };
 
@@ -23,4 +25,4 @@ export const fmtMoney = (amount: number, currency: string = "EGP") => {
 
 export type AuthUser = SysUser;
 export type Role = SysUserRole;
-export type { Warehouse, Product, Dashboard as DashboardStats };
+export type { Warehouse, Product, Dashboard as DashboardStats, Invoice };

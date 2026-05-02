@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp, warehouseQuery } from "@/lib/app-context";
-import { api, fmtDate, fmtMoney, type Invoice, type Product } from "@/services/api/api";
+import { api, fmtDate, fmtMoney, type Product, type Invoice } from "@/services/api/api";
 import { customFetch } from "@/services/api/custom-fetch";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
+import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Table,
   TableBody,
@@ -30,11 +34,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DataTable } from "@/components/ui/data-table";
-import { Loader } from "@/components/shared/loader";
 import { useConfirmation } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Printer, Eye, X } from "lucide-react";
+import { Plus, Trash2, Printer, Search, Eye } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 
 function getInvoiceColumns(
@@ -133,10 +135,19 @@ export default function InvoicesPage() {
   const [customer, setCustomer] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [view, setView] = useState<Invoice | null>(null);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 800); // Increased from 500ms to 800ms
 
   const { data: invoicesResponse = [], isLoading: isInvoicesLoading } = useQuery({
-    queryKey: ["invoices", selectedWarehouseId],
-    queryFn: () => customFetch<Invoice[]>(`/api/invoices${warehouseQuery(selectedWarehouseId)}`),
+    queryKey: ["invoices", selectedWarehouseId, debouncedSearch],
+    queryFn: () => {
+      const params = { 
+        warehouseId: selectedWarehouseId || undefined,
+        q: debouncedSearch || undefined
+      };
+      return api.listInvoices(params);
+    },
+    enabled: !!selectedWarehouseId,
   });
 
   // Extract invoices array from response
@@ -144,7 +155,7 @@ export default function InvoicesPage() {
 
   const { data: productsResponse = [], isLoading: isProductsLoading } = useQuery({
     queryKey: ["products", selectedWarehouseId, ""],
-    queryFn: () => customFetch<Product[]>(`/api/products${warehouseQuery(selectedWarehouseId)}`),
+    queryFn: () => api.listProducts({ warehouseId: selectedWarehouseId ?? undefined }),
   });
 
   // Extract products array from response
@@ -153,21 +164,17 @@ export default function InvoicesPage() {
   const createMut = useMutation({
     mutationFn: () => {
       const validLines = lines.filter(l => l.productCode && l.quantity > 0);
-      return customFetch<Invoice>("/api/invoices", {
-        method: "POST",
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      return api.createInvoice({
           customerName: customer,
           items: validLines.map(l => ({
             productCode: l.productCode,
             quantity: l.quantity,
             price: l.price,
           })),
-          warehouseId: selectedWarehouseId,
-        }),
-      });
+          warehouseId: selectedWarehouseId ?? undefined,
+      } as any);
     },
-    onSuccess: (inv) => {
+    onSuccess: (inv: any) => {
       toast({ title: `تم إنشاء الفاتورة ${inv.invoiceNumber}` });
       qc.invalidateQueries({ queryKey: ["invoices"] });
       qc.invalidateQueries({ queryKey: ["products"] });
@@ -180,7 +187,7 @@ export default function InvoicesPage() {
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => customFetch(`/api/invoices/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: number) => api.deleteInvoice(id),
     onSuccess: () => {
       toast({ title: "تم الحذف" });
       qc.invalidateQueries({ queryKey: ["invoices"] });
@@ -228,7 +235,13 @@ export default function InvoicesPage() {
       .join("");
     
     const date = new Date(inv.createdAt);
-    const formattedDate = date.toLocaleDateString("ar-EG", { day: 'numeric', month: 'numeric', year: 'numeric' });
+    const formattedDate = new Date(inv.createdAt).toLocaleString("ar-EG", { 
+      day: 'numeric', 
+      month: 'numeric', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
     const printDateTime = new Date().toLocaleString("ar-EG");
     
     w.document.write(`
@@ -395,8 +408,9 @@ export default function InvoicesPage() {
       <div class="page">
         <div class="invoice-header">
           <h2>${settings.companyName ?? ""}</h2>
-          <p>لإدارة المخزون وقطع غيار السيارات</p>
-          ${settings.companyPhone ? `<p>هاتف: ${settings.companyPhone}</p>` : ''}
+          ${settings.companyPhone ? `<p>هاتف: ${settings.companyPhone}${settings.companyPhone2 ? ` - ${settings.companyPhone2}` : ''}</p>` : ''}
+          ${settings.companyEmail ? `<p>بريد: ${settings.companyEmail}</p>` : ''}
+          ${settings.companyAddress ? `<p>عنوان: ${settings.companyAddress}</p>` : ''}
         </div>
         
         <div class="invoice-details">
@@ -465,7 +479,7 @@ export default function InvoicesPage() {
                 إنشاء فاتورة
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl bg-gray-800 border-gray-700 text-white p-0 overflow-hidden" dir="rtl">
+            <DialogContent className="max-w-3xl bg-[#111127] border-gray-700 text-white p-0 overflow-hidden" dir="rtl">
               <DialogHeader className="p-5 border-b border-gray-700">
                 <DialogTitle className="text-white text-lg font-bold">إنشاء فاتورة جديدة</DialogTitle>
               </DialogHeader>
@@ -475,13 +489,13 @@ export default function InvoicesPage() {
                   <Input
                     value={customer}
                     onChange={(e) => setCustomer(e.target.value)}
-                    className="w-full bg-gray-900 border-gray-600 text-white rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    className="w-full bg-[#111127] border-gray-600 text-white rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
                     placeholder="أدخل اسم العميل..."
                   />
                 </div>
                 <div className="border border-gray-700 rounded-lg overflow-hidden">
                   <Table>
-                    <TableHeader className="bg-gray-900">
+                    <TableHeader className="bg-[#111127]">
                       <TableRow className="border-gray-700">
                         <TableHead className="w-48 text-right text-gray-300">المنتج</TableHead>
                         <TableHead className="w-24 text-center text-gray-300">الكمية</TableHead>
@@ -490,7 +504,7 @@ export default function InvoicesPage() {
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
-                    <TableBody className="bg-gray-800">
+                    <TableBody className="bg-[#111127]">
                       {lines.length === 0 && (
                         <TableRow className="border-gray-700">
                           <TableCell colSpan={5} className="text-center text-gray-400 py-6">
@@ -501,7 +515,13 @@ export default function InvoicesPage() {
                       {lines.map((l, i) => (
                         <TableRow key={`${l.productCode}-${i}`} className="border-gray-700 hover:bg-gray-750">
                           <TableCell>
-                            <Select
+                            <Combobox
+                              options={products
+                                .filter((p: Product) => p.quantity > 0)
+                                .map((p: Product) => ({
+                                  label: `${p.name} — متاح ${p.quantity}`,
+                                  value: p.code,
+                                }))}
                               value={l.productCode}
                               onValueChange={(code) => {
                                 const p = products.find((x: Product) => x.code === code);
@@ -513,20 +533,10 @@ export default function InvoicesPage() {
                                   });
                                 }
                               }}
-                            >
-                              <SelectTrigger className="h-9 bg-gray-900 border-gray-600 text-white">
-                                <SelectValue placeholder="اختر منتج" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                                {products
-                                  .filter((p: Product) => p.quantity > 0)
-                                  .map((p: Product) => (
-                                    <SelectItem key={p.id} value={p.code} className="hover:bg-gray-700 focus:bg-gray-700 text-white">
-                                      {p.name} — متاح {p.quantity}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
+                              placeholder="اختر منتج..."
+                              emptyText="لا يوجد منتجات"
+                              className="w-full bg-[#111127] border-gray-600 text-white"
+                            />
                           </TableCell>
                           <TableCell>
                             <Input
@@ -535,7 +545,7 @@ export default function InvoicesPage() {
                               onChange={(e) =>
                                 updateLine(i, { quantity: Number(e.target.value) || 0 })
                               }
-                              className="h-9 bg-gray-900 border-gray-600 text-white text-center"
+                              className="h-9 bg-[#111127] border-gray-600 text-white text-center"
                             />
                           </TableCell>
                           <TableCell>
@@ -559,11 +569,11 @@ export default function InvoicesPage() {
                     </TableBody>
                   </Table>
                 </div>
-                <Button onClick={addEmptyLine} variant="outline" className="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                <Button onClick={addEmptyLine} variant="outline" className="w-full bg-[#111127] border-gray-600 text-white hover:bg-gray-600">
                   <Plus className="size-4 ml-2" />
                   إضافة صنف جديد
                 </Button>
-                <div className="flex justify-between items-center bg-gray-900 p-4 rounded-lg">
+                <div className="flex justify-between items-center bg-[#111127] p-4 rounded-lg">
                   <span className="text-gray-300 font-bold">الإجمالي الكلي</span>
                   <span className="text-2xl font-bold text-blue-400 font-mono">{fmtMoney(total, currency)}</span>
                 </div>
@@ -585,14 +595,23 @@ export default function InvoicesPage() {
         )}
       </div>
 
+      <div className="flex items-center gap-2 w-full sm:max-w-md">
+        <div className="relative w-full">
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground size-4" />
+          <Input
+            placeholder="بحث برقم الفاتورة أو العميل..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pr-10 w-full"
+          />
+        </div>
+      </div>
+
       <Card className="p-0 overflow-hidden">
         <DataTable
           columns={getInvoiceColumns(currency, canEdit, setView, printInvoice, deleteMut, confirm)}
           data={invoices}
-          searchKey="customerName"
-          searchPlaceholder="بحث بالعميل أو رقم الفاتورة..."
-          emptyMessage="لا توجد فواتير مسجلة بعد"
-          isLoading={isInvoicesLoading}
+          emptyMessage="لا توجد فواتير"
         />
       </Card>
       
@@ -612,14 +631,25 @@ export default function InvoicesPage() {
                     <span className="text-2xl font-black text-white">{settings.companyName?.substring(0, 2) || "SN"}</span>
                   </div>
                   <h1 className="text-3xl font-black text-white tracking-tight">{settings.companyName || "اسم الشركة"}</h1>
-                  <div className="flex items-center gap-2 text-blue-100/80 text-sm font-medium">
-                    <span>{settings.companyAddress || "قطع غيار السيارات الأصلية"}</span>
-                    {settings.companyPhone && (
-                      <>
-                        <span className="w-1 h-1 rounded-full bg-blue-300/40"></span>
+                  <div className="flex flex-col items-center gap-1 text-blue-100/80 text-sm font-medium">
+                    <span>{settings.companyAddress || "العنوان"}</span>
+                    <div className="flex items-center gap-2">
+                      {settings.companyPhone && (
                         <span>{settings.companyPhone}</span>
-                      </>
-                    )}
+                      )}
+                      {settings.companyPhone2 && (
+                        <>
+                          <span className="w-1 h-1 rounded-full bg-blue-300/40"></span>
+                          <span>{settings.companyPhone2}</span>
+                        </>
+                      )}
+                      {settings.companyEmail && (
+                        <>
+                          <span className="w-1 h-1 rounded-full bg-blue-300/40"></span>
+                          <span>{settings.companyEmail}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

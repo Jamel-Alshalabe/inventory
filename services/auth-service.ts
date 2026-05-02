@@ -1,5 +1,5 @@
 // Authentication Service for Laravel Sanctum
-import { api } from './api';
+import { api } from './api/api';
 
 export interface LoginCredentials {
   username: string;
@@ -11,9 +11,11 @@ export interface AuthResponse {
   user: {
     id: number;
     username: string;
-    role: 'admin' | 'user' | 'editor';
+    role: 'admin' | 'user' | 'editor' | 'super_admin' | 'auditor';
+    permissions: string[];
     assignedWarehouseId: number | null;
     assignedWarehouseName: string | null;
+    maxWarehouses: number;
   };
 }
 

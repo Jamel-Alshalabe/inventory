@@ -27,12 +27,10 @@ export default function WarehousesPage() {
   const [name, setName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Debounced search effect
   useEffect(() => {
     const timer = setTimeout(() => {
       qc.invalidateQueries({ queryKey: ["warehouses-page"] });
     }, 300);
-
     return () => clearTimeout(timer);
   }, [searchQuery, qc]);
 
@@ -67,7 +65,6 @@ export default function WarehousesPage() {
     },
     onError: (error: any) => {
       let errorMessage = "حدث خطأ أثناء إضافة المخزن";
-      
       if (error?.message) {
         if (error.message.includes("الحد الأقصى المسموح به")) {
           errorMessage = error.message;
@@ -75,7 +72,6 @@ export default function WarehousesPage() {
           errorMessage = error.message;
         }
       }
-      
       toast({ 
         title: "خطأ", 
         description: errorMessage, 
@@ -101,7 +97,6 @@ export default function WarehousesPage() {
     onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
   });
 
-  // Check if user can create more warehouses
   const u = user as any;
   const maxW = u?.maxWarehouses || 1;
   const canCreateMoreWarehouses = u?.role === 'super_admin' || 
@@ -151,47 +146,46 @@ export default function WarehousesPage() {
                 <span>مخزن جديد</span>
               </Button>
             </DialogTrigger>
-          <DialogContent dir="rtl" className="bg-[#0b0b1a] border border-slate-700/50 text-white">
-            <DialogHeader>
-              <DialogTitle className="text-white text-xl">إضافة مخزن جديد</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label className="text-slate-400">اسم المخزن</Label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="bg-[#0e0c20] border-slate-700 text-white focus:ring-blue-500/50"
-                  placeholder="مثال: مخزن المنتجات الرئيسية"
-                  data-testid="input-warehouse-name"
-                />
-              </div>
-              {!canCreateMoreWarehouses && u?.role !== 'super_admin' && (
-                <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                  <AlertCircle className="size-5 text-amber-500 shrink-0" />
-                  <p className="text-sm text-amber-200">
-                    لقد وصلت إلى الحد الأقصى للمخازن المسموح به ({maxW})
-                  </p>
+            <DialogContent dir="rtl" className="bg-[#0b0b1a] border border-slate-700/50 text-white">
+              <DialogHeader>
+                <DialogTitle className="text-white text-xl">إضافة مخزن جديد</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label className="text-slate-400">اسم المخزن</Label>
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="bg-[#0e0c20] border-slate-700 text-white focus:ring-blue-500/50"
+                    placeholder="مثال: مخزن المنتجات الرئيسية"
+                    data-testid="input-warehouse-name"
+                  />
                 </div>
-              )}
-            </div>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)} className="border-slate-700 text-slate-400 hover:bg-slate-800">
-                إلغاء
-              </Button>
-              <Button 
-                onClick={() => createMut.mutate()} 
-                disabled={!name || createMut.isPending}
-                className="bg-blue-600 hover:bg-blue-500"
-              >
-                {createMut.isPending && <div className="size-4 animate-spin ml-2 border-2 border-white/30 border-t-white rounded-full" />}
-                حفظ المخزن
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
+                {!canCreateMoreWarehouses && u?.role !== 'super_admin' && (
+                  <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                    <AlertCircle className="size-5 text-amber-500 shrink-0" />
+                    <p className="text-sm text-amber-200">
+                      لقد وصلت إلى الحد الأقصى للمخازن المسموح به ({maxW})
+                    </p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)} className="border-slate-700 text-slate-400 hover:bg-slate-800">
+                  إلغاء
+                </Button>
+                <Button 
+                  onClick={() => createMut.mutate()} 
+                  disabled={!name || createMut.isPending}
+                  className="bg-blue-600 hover:bg-blue-500"
+                >
+                  {createMut.isPending && <div className="size-4 animate-spin ml-2 border-2 border-white/30 border-t-white rounded-full" />}
+                  حفظ المخزن
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -209,7 +203,6 @@ export default function WarehousesPage() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-xl font-bold text-white group-hover:text-blue-100 transition-colors line-clamp-1">{w.name}</h3>
-                   
                   </div>
                 </div>
                 <Button
@@ -239,30 +232,28 @@ export default function WarehousesPage() {
               )}
             </div>
             
-            {/* Decorative Background Elements */}
             <div className="absolute -bottom-6 -right-6 size-32 bg-blue-500/5 blur-3xl rounded-full group-hover:bg-blue-500/10 transition-colors duration-500" />
             <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-700" />
           </Card>
         ))}
-        
-        {canCreateMoreWarehouses && warehouses.length === 0 && (
-          <div className="col-span-full py-20 text-center space-y-4 bg-slate-900/20 border-2 border-dashed border-slate-800 rounded-3xl">
-            <WarehouseIcon className="size-16 mx-auto text-slate-700" />
-            <div className="space-y-2">
-              <p className="text-slate-400 text-lg font-medium">لا توجد مخازن مضافة بعد</p>
-              <Button 
-                variant="outline" 
-                onClick={() => setOpen(true)}
-                className="border-slate-700 text-slate-400 hover:bg-slate-800"
-              >
-                اضغط لإضافة أول مخزن
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {canCreateMoreWarehouses && warehouses.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="size-20 rounded-full bg-slate-800/50 border border-slate-700 flex items-center justify-center mb-6">
+            <WarehouseIcon className="size-10 text-slate-400" />
+          </div>
+          <p className="text-slate-400 text-lg font-medium">لا توجد مخازن مضافة بعد</p>
+          <Button 
+            variant="outline" 
+            onClick={() => setOpen(true)}
+            className="border-slate-700 text-slate-400 hover:bg-slate-800"
+          >
+            اضغط لإضافة أول مخزن
+          </Button>
+        </div>
+      )}
+
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent dir="rtl" className="bg-[#16162b] border border-slate-700/50 text-white max-w-md">
           <DialogHeader>

@@ -83,53 +83,55 @@ export function DataTable<TData, TValue>({
   return (
     <div className={cn("space-y-6 p-4", className)}>
       {/* Search and Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-8">
-        <div className="flex items-center space-x-2 space-x-reverse w-full sm:w-auto">
-          <div className="relative w-full sm:w-auto">
-            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground size-4" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-              onChange={(event) =>
-                table.getColumn(searchKey)?.setFilterValue(event.target.value)
-              }
-              className="pl-10 pr-10 w-full sm:w-64"
-            />
+      {searchKey && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-8">
+          <div className="flex items-center space-x-2 space-x-reverse w-full sm:w-auto">
+            <div className="relative w-full sm:w-auto">
+              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground size-4" />
+              <Input
+                placeholder={searchPlaceholder}
+                value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+                onChange={(event) =>
+                  table.getColumn(searchKey)?.setFilterValue(event.target.value)
+                }
+                className="pl-10 pr-10 w-full sm:w-64"
+              />
+            </div>
           </div>
+          
+          {/* Column Visibility Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="ml-auto text-sm">
+                <span className="hidden sm:inline">الأعمدة</span>
+                <span className="sm:hidden">أعمدة</span>
+                <ChevronDown className="mr-1 sm:mr-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuLabel>إظهار/إخفاء الأعمدة</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  )
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        
-        {/* Column Visibility Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto text-sm">
-              <span className="hidden sm:inline">الأعمدة</span>
-              <span className="sm:hidden">أعمدة</span>
-              <ChevronDown className="mr-1 sm:mr-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuLabel>إظهار/إخفاء الأعمدة</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                  >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                )
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      )}
 
       {/* Table */}
       <div className="rounded-md border border-border bg-card overflow-x-auto sidebar-scrollbar">

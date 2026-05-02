@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type AuthUser, type Warehouse } from "@/services/api/api";
 import { customFetch } from "@/services/api/custom-fetch";
 import { useApp } from "@/lib/app-context";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Edit, Eye, Shield } from "lucide-react";
+import { Plus, Trash2, Edit, Eye, Shield, Search } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 
 import { PageLoader } from "@/components/ui/page-loader";
@@ -47,23 +48,64 @@ export default function UsersPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 800); // Increased from 500ms to 800ms
+
   // Determine filtering info for display
-  const isSuperAdmin = me?.role === 'super_admin';
+  const isSuperAdmin = (me?.role as string) === 'super_admin';
   const filterInfo = isSuperAdmin 
     ? "جميع المستخدمين" 
     : "المستخدمين التابعين لك";
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "user" | "editor">("user");
-  const [warehouseId, setWarehouseId] = useState<string>("");
+  const [role, setRole] = useState<"admin" | "user" | "editor" | "auditor">("user");
+  const [warehouseId, setWarehouseId] = useState<string>(""); 
   const [maxWarehouses, setMaxWarehouses] = useState<number>(1);
+  const [companyName, setCompanyName] = useState("");
+  const [companyPhone, setCompanyPhone] = useState("");
+  const [phone2, setPhone2] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [companyCurrency, setCompanyCurrency] = useState("ج.م");
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
-  
-  
+
+  // Task 5: Auto-select permissions based on role
+  const handleRoleChange = (newRole: string) => {
+    setRole(newRole as any);
+    if (me?.role === 'admin') {
+      if (newRole === 'admin') {
+        // Manager: All permissions except subscriptions
+        const allExceptSubs = availablePermissions
+          .filter(p => !p.name.includes('subscription'))
+          .map(p => p.name);
+        setSelectedPermissions(allExceptSubs);
+      } else if (newRole === 'auditor') {
+        // Auditor: All 'view' permissions
+        const viewOnly = availablePermissions
+          .filter(p => p.name.startsWith('view-'))
+          .map(p => p.name);
+        setSelectedPermissions(viewOnly);
+      } else {
+        setSelectedPermissions([]);
+      }
+    }
+  };
+
   const { data: response = { data: [] }, isLoading, isFetching } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => api.listUsers(),
+    queryKey: ["users", debouncedSearch],
+    queryFn: () => api.listUsers({ q: debouncedSearch }),
   });
+
+  // Fetch all warehouses for assignment
+  const { data: allWarehousesResponse = [] } = useQuery({
+    queryKey: ["all-warehouses"],
+    queryFn: () => api.listWarehouses(),
+    enabled: !!me,
+  });
+
+  const allWarehouses = Array.isArray(allWarehousesResponse) 
+    ? allWarehousesResponse 
+    : (allWarehousesResponse as any)?.data || [];
 
   // Extract users array from response
   const users = Array.isArray(response) ? response : response?.data || [];
@@ -73,13 +115,17 @@ export default function UsersPage() {
   const isDataLoading = isLoading || (isFetching && users.length === 0);
 
   // Fetch available permissions
-  const { data: permissionsResponse = { permissions: [] } } = useQuery({
+  const { data: permissionsResponse = { permissions: [], grouped: {} } } = useQuery({
     queryKey: ["permissions"],
-    queryFn: () => customFetch<{ permissions: Array<{ id: number; name: string; display_name: string }> }>("/api/users/permissions"),
-    enabled: me?.role === 'admin' || me?.role === 'super_admin',
+    queryFn: () => customFetch<{ 
+      permissions: Array<{ id: number; name: string; display_name: string }>,
+      grouped: Record<string, Array<{ id: number; name: string; display_name: string }>>
+    }>("/api/users/permissions"),
+    enabled: (me?.role as string) === 'admin' || (me?.role as string) === 'super_admin',
   });
 
   const availablePermissions = permissionsResponse.permissions || [];
+  const groupedPermissions = permissionsResponse.grouped || {};
 
   // Type for permission object
   type Permission = {
@@ -111,10 +157,12 @@ export default function UsersPage() {
                 ? "bg-primary text-primary-foreground"
                 : role === "user"
                 ? "bg-accent text-accent-foreground"
+                : role === "auditor"
+                ? "bg-blue-500 text-white"
                 : "bg-muted"
             }
           >
-            {role === "admin" ? "مدير" : role === "user" ? "مستخدم" : role === "editor" ? "مراجع حسابات" : role}
+            {role === "admin" ? "مدير" : role === "user" ? "مستخدم" : role === "auditor" ? "مراجع" : role}
           </Badge>
         );
       },
@@ -149,10 +197,18 @@ export default function UsersPage() {
                   onClick={() => {
                     setSelectedUser(u);
                     setUsername(u.username);
-                    setRole(u.role as "admin" | "user" | "editor");
+                    setEmail(u.email || "");
+                    setRole(u.role as any);
                     setWarehouseId(u.assignedWarehouseId?.toString() || "");
-                    setMaxWarehouses(u.max_warehouses || 1);
-                    setSelectedPermissions((u as any).permissions || []);
+                    setMaxWarehouses(u.maxWarehouses || 1);
+                    setCompanyName(u.companyName || "");
+                    setCompanyPhone(u.companyPhone || "");
+                    setPhone2(u.phone2 || "");
+                    setCompanyAddress(u.companyAddress || "");
+                    setCompanyCurrency(u.companyCurrency || "ج.م");
+                    // Force a small delay or ensure we use the fresh data from the row
+                    const currentPermissions = Array.isArray(u.permissions) ? u.permissions : [];
+                    setSelectedPermissions([...currentPermissions]);
                     setEditOpen(true);
                   }}
                 >
@@ -205,16 +261,21 @@ export default function UsersPage() {
     onSuccess: () => {
       toast({
         title: "تم إضافة المستخدم",
-        variant: "default",
-        className: "bg-green-500 text-white border-green-600"
+        variant: "success",
       });
       qc.invalidateQueries({ queryKey: ["users"] });
       setOpen(false);
       setUsername("");
+      setEmail("");
       setPassword("");
       setRole("user");
       setWarehouseId("");
       setMaxWarehouses(1);
+      setCompanyName("");
+      setCompanyPhone("");
+      setPhone2("");
+      setCompanyAddress("");
+      setCompanyCurrency("ج.م");
       setSelectedPermissions([]);
     },
     onError: (error: any) => {
@@ -231,8 +292,7 @@ export default function UsersPage() {
     onSuccess: () => {
       toast({ 
         title: "تم الحذف",
-        variant: "default",
-        className: "bg-green-500 text-white border-green-600"
+        variant: "success",
       });
       qc.invalidateQueries({ queryKey: ["users"] });
       setDeleteOpen(false);
@@ -244,22 +304,27 @@ export default function UsersPage() {
   const updateMut = useMutation({
     mutationFn: (data: any) =>
       customFetch(`/api/users/${selectedUser?.id}`, {
-        method: "PUT",
+        method: "PATCH",
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
       toast({ 
         title: "تم التحديث",
-        variant: "default",
-        className: "bg-green-500 text-white border-green-600"
+        variant: "success",
       });
       qc.invalidateQueries({ queryKey: ["users"] });
       setEditOpen(false);
       setSelectedUser(null);
       setUsername("");
+      setEmail("");
       setPassword("");
       setRole("user");
       setMaxWarehouses(1);
+      setCompanyName("");
+      setCompanyPhone("");
+      setPhone2("");
+      setCompanyAddress("");
+      setCompanyCurrency("ج.م");
       setSelectedPermissions([]);
     },
     onError: (e: Error) => toast({ title: "خطأ", description: e.message, variant: "destructive" }),
@@ -306,14 +371,13 @@ export default function UsersPage() {
               </div>
               <div className="space-y-2">
                 <Label>الدور</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as any)}>
+                <Select value={role} onValueChange={handleRoleChange}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">مدير</SelectItem>
                     <SelectItem value="user">مستخدم</SelectItem>
-                    <SelectItem value="editor">مراجع حسابات</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -331,67 +395,75 @@ export default function UsersPage() {
                 </div>
               )}
             </div>
-
-            {/* Warehouse Assignment - Only for Admin (not super_admin) */}
-            {me?.role === 'admin' && (
-              <div className="space-y-2">
-                <Label>إسناد مخزن</Label>
-                <Select value={warehouseId} onValueChange={setWarehouseId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر مخزناً" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {warehouses.map((w: Warehouse) => (
-                      <SelectItem key={w.id} value={String(w.id)}>
-                        {w.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {/* Warehouse Assignment - Visible for both Super Admin (assigning to manager) and Admin (assigning to staff) */}
+            <div className="space-y-2 mt-4">
+              <Label>إسناد مخزن</Label>
+              <Select value={warehouseId} onValueChange={setWarehouseId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر مخزناً" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allWarehouses.map((w: Warehouse) => (
+                    <SelectItem key={w.id} value={String(w.id)}>
+                      {w.name} {isSuperAdmin && w.admin?.username ? `(${w.admin.username})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Permissions Section - Only for Admins (not superadmin) */}
-            {me?.role === 'admin' && (
-              <div className="space-y-3 border-t pt-4">
+            {(me?.role as string) === 'admin' && (
+              <div className="space-y-4 border-t pt-4 mt-4">
                 <div className="flex items-center gap-2">
                   <Shield className="size-4 text-primary" />
-                  <Label className="text-base font-medium">الصلاحيات</Label>
+                  <Label className="text-base font-bold">صلاحيات المستخدم</Label>
                 </div>
-                <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto border rounded-md p-3">
-                  {availablePermissions
-                    .filter((p: Permission) => p.name.startsWith('view-'))
-                    .map((permission: Permission) => (
-                    <div key={permission.id} className="flex items-center space-gap-2 space-x-2">
-                      <Checkbox
-                        id={`permission-${permission.id}`}
-                        checked={selectedPermissions.includes(permission.name)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedPermissions([...selectedPermissions, permission.name]);
-                          } else {
-                            setSelectedPermissions(selectedPermissions.filter(p => p !== permission.name));
-                          }
-                        }}
-                      />
-                      <Label 
-                        htmlFor={`permission-${permission.id}`} 
-                        className="text-sm cursor-pointer"
-                      >
-                        {permission.display_name.replace('عرض ', 'دخول صفحة ')}
-                      </Label>
+                
+                <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                  {Object.entries(groupedPermissions)
+                    .filter(([category]) => category !== 'الاشتراكات')
+                    .map(([category, perms]) => (
+                    <div key={category} className="space-y-2">
+                      <h4 className="text-xs font-bold text-muted-foreground bg-muted/30 px-2 py-1 rounded border-r-2 border-primary">
+                        {category}
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 px-1">
+                        {perms.map((permission: Permission) => (
+                          <div key={permission.id} className="flex items-center gap-2 hover:bg-muted/20 p-1 rounded transition-colors">
+                            <Checkbox
+                              id={`permission-${permission.id}`}
+                              checked={selectedPermissions.includes(permission.name)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedPermissions([...selectedPermissions, permission.name]);
+                                } else {
+                                  setSelectedPermissions(selectedPermissions.filter(p => p !== permission.name));
+                                }
+                              }}
+                            />
+                            <Label 
+                              htmlFor={`permission-${permission.id}`} 
+                              className="text-xs cursor-pointer leading-none"
+                            >
+                              {permission.display_name}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
+                
                 {selectedPermissions.length > 0 && (
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs font-medium text-primary bg-primary/5 p-2 rounded border border-primary/10">
                     تم اختيار {selectedPermissions.length} صلاحية
                   </div>
                 )}
               </div>
             )}
-            
-            <DialogFooter>
+
+            <DialogFooter className="mt-6">
               <Button variant="outline" onClick={() => setOpen(false)}>
                 إلغاء
               </Button>
@@ -419,12 +491,24 @@ export default function UsersPage() {
           </div>
         </div>
         
+        <div className="flex items-center gap-2 w-full sm:max-w-md py-4">
+          <Search className="size-4 text-slate-400 shrink-0" />
+          <Input
+            placeholder="بحث بالمستخدم..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+            }}
+            className="bg-[#0e0c20] text-white placeholder:text-slate-500 w-full"
+          />
+        </div>
+        
         <DataTable 
           columns={columns} 
           data={displayUsers} 
-          searchKey="username"
-          searchPlaceholder="بحث عن مستخدم..."
           emptyMessage="لا يوجد مستخدمين"
+          isLoading={isDataLoading}
+          // Remove searchKey and searchPlaceholder to hide the internal DataTable search
         />
       </Card>
 
@@ -434,95 +518,127 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle>تعديل المستخدم</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>اسم المستخدم</Label>
               <Input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                data-testid="input-edit-username"
+                data-testid="input-username"
               />
             </div>
             <div className="space-y-2">
               <Label>كلمة المرور</Label>
               <Input
                 type="password"
-                placeholder="اتركه فارغاً إذا كنت لا تريد تغييره"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                data-testid="input-edit-password"
+                data-testid="input-password"
               />
             </div>
             <div className="space-y-2">
               <Label>الدور</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as typeof role)}>
+              <Select value={role} onValueChange={handleRoleChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">مدير</SelectItem>
                   <SelectItem value="user">مستخدم</SelectItem>
-                  <SelectItem value="editor">مراجع حسابات</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>أقصى عدد مخازن</Label>
-              <Input
-                type="number"
-                min="1"
-                value={maxWarehouses}
-                onChange={(e) => setMaxWarehouses(Number(e.target.value))}
-              />
-            </div>
+            {isSuperAdmin && (
+              <div className="space-y-2">
+                <Label>أقصى عدد من المخازن</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={maxWarehouses}
+                  onChange={(e) => setMaxWarehouses(Number(e.target.value))}
+                  data-testid="input-max-warehouses"
+                />
+              </div>
+            )}
           </div>
-          
+
+          {/* Warehouse Assignment - Visible for both Super Admin and Admin */}
+          <div className="space-y-2 mt-4">
+            <Label>إسناد مخزن</Label>
+            <Select value={warehouseId} onValueChange={setWarehouseId}>
+              <SelectTrigger>
+                <SelectValue placeholder="اختر مخزناً" />
+              </SelectTrigger>
+              <SelectContent>
+                {allWarehouses.map((w: Warehouse) => (
+                  <SelectItem key={w.id} value={String(w.id)}>
+                    {w.name} {isSuperAdmin && (w as any).admin?.username ? `(${(w as any).admin.username})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Permissions Section - Only for Admins (not superadmin) */}
-          {me?.role === 'admin' && (
-            <div className="space-y-3 border-t pt-4">
+          {(me?.role as string) === 'admin' && (
+            <div className="space-y-4 border-t pt-4 mt-4 px-6 pb-2">
               <div className="flex items-center gap-2">
                 <Shield className="size-4 text-primary" />
-                <Label className="text-base font-medium">الصلاحيات</Label>
+                <Label className="text-base font-bold">تعديل الصلاحيات</Label>
               </div>
-              <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto border rounded-md p-3">
-                {availablePermissions
-                  .filter((p: Permission) => p.name.startsWith('view-'))
-                  .map((permission: Permission) => (
-                  <div key={permission.id} className="flex items-center space-gap-2 space-x-2">
-                    <Checkbox
-                      id={`edit-permission-${permission.id}`}
-                      checked={selectedPermissions.includes(permission.name)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedPermissions([...selectedPermissions, permission.name]);
-                        } else {
-                          setSelectedPermissions(selectedPermissions.filter(p => p !== permission.name));
-                        }
-                      }}
-                    />
-                    <Label 
-                      htmlFor={`edit-permission-${permission.id}`} 
-                      className="text-sm cursor-pointer"
-                    >
-                      {permission.display_name.replace('عرض ', 'دخول صفحة ')}
-                    </Label>
+              
+              <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                {Object.entries(groupedPermissions)
+                  .filter(([category]) => category !== 'الاشتراكات')
+                  .map(([category, perms]) => (
+                  <div key={category} className="space-y-2">
+                    <h4 className="text-xs font-bold text-muted-foreground bg-muted/30 px-2 py-1 rounded border-r-2 border-primary">
+                      {category}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2 px-1">
+                      {perms.map((permission: Permission) => (
+                        <div key={permission.id} className="flex items-center gap-2 hover:bg-muted/20 p-1 rounded transition-colors">
+                          <Checkbox
+                            id={`edit-permission-${permission.id}`}
+                            checked={selectedPermissions.includes(permission.name)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPermissions([...selectedPermissions, permission.name]);
+                              } else {
+                                setSelectedPermissions(selectedPermissions.filter(p => p !== permission.name));
+                              }
+                            }}
+                          />
+                          <Label 
+                            htmlFor={`edit-permission-${permission.id}`} 
+                            className="text-xs cursor-pointer leading-none"
+                          >
+                            {permission.display_name}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
+              
               {selectedPermissions.length > 0 && (
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs font-medium text-primary bg-primary/5 p-2 rounded border border-primary/10">
                   تم اختيار {selectedPermissions.length} صلاحية
                 </div>
               )}
             </div>
           )}
-          <DialogFooter>
+
+            <DialogFooter className="px-6 py-4 border-t">
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               إلغاء
             </Button>
             <Button
               onClick={() => updateMut.mutate({
                 username,
+                email: email || null,
                 ...(password && { password }),
                 role: role as any,
                 assignedWarehouseId: warehouseId ? parseInt(warehouseId) : null,
@@ -555,7 +671,7 @@ export default function UsersPage() {
                 <p className="font-semibold">
                   {(selectedUser?.role as any) === "admin" ? "مدير" : 
                    (selectedUser?.role as any) === "user" ? "مستخدم" : 
-                   (selectedUser?.role as any) === "editor" ? "مراجع حسابات" : selectedUser?.role}
+                   (selectedUser?.role as any) === "auditor" ? "مراجع" : selectedUser?.role}
                 </p>
               </div>
               

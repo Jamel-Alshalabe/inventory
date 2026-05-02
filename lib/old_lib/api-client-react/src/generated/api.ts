@@ -836,7 +836,7 @@ export const useDeleteProduct = <
   return useMutation(getDeleteProductMutationOptions(options));
 };
 
-export const getListMovementsUrl = (params?: ListMovementsParams) => {
+export const getListMovementsUrl = (params?: ListMovementsParams & { q?: string }) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -853,7 +853,7 @@ export const getListMovementsUrl = (params?: ListMovementsParams) => {
 };
 
 export const listMovements = async (
-  params?: ListMovementsParams,
+  params?: ListMovementsParams & { q?: string },
   options?: RequestInit,
 ): Promise<Movement[]> => {
   return customFetch<Movement[]>(getListMovementsUrl(params), {
@@ -862,7 +862,7 @@ export const listMovements = async (
   });
 };
 
-export const getListMovementsQueryKey = (params?: ListMovementsParams) => {
+export const getListMovementsQueryKey = (params?: ListMovementsParams & { q?: string }) => {
   return [`/api/movements`, ...(params ? [params] : [])] as const;
 };
 
@@ -870,7 +870,7 @@ export const getListMovementsQueryOptions = <
   TData = Awaited<ReturnType<typeof listMovements>>,
   TError = ErrorType<unknown>,
 >(
-  params?: ListMovementsParams,
+  params?: ListMovementsParams & { q?: string },
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listMovements>>,
@@ -904,7 +904,7 @@ export function useListMovements<
   TData = Awaited<ReturnType<typeof listMovements>>,
   TError = ErrorType<unknown>,
 >(
-  params?: ListMovementsParams,
+  params?: ListMovementsParams & { q?: string },
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listMovements>>,
@@ -1007,6 +1007,23 @@ export const getDeleteMovementUrl = (id: number) => {
   return `/api/movements/${id}`;
 };
 
+export const getUpdateMovementUrl = (id: number) => {
+  return `/api/movements/${id}`;
+};
+
+export const updateMovement = async (
+  id: number,
+  updateMovementBody: CreateMovementBody,
+  options?: RequestInit,
+): Promise<Movement> => {
+  return customFetch<Movement>(getUpdateMovementUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateMovementBody),
+  });
+};
+
 export const deleteMovement = async (
   id: number,
   options?: RequestInit,
@@ -1081,7 +1098,7 @@ export const useDeleteMovement = <
   return useMutation(getDeleteMovementMutationOptions(options));
 };
 
-export const getListInvoicesUrl = (params?: ListInvoicesParams) => {
+export const getListInvoicesUrl = (params?: ListInvoicesParams & { q?: string }) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -1098,7 +1115,7 @@ export const getListInvoicesUrl = (params?: ListInvoicesParams) => {
 };
 
 export const listInvoices = async (
-  params?: ListInvoicesParams,
+  params?: ListInvoicesParams & { q?: string },
   options?: RequestInit,
 ): Promise<Invoice[]> => {
   return customFetch<Invoice[]>(getListInvoicesUrl(params), {
@@ -1107,7 +1124,7 @@ export const listInvoices = async (
   });
 };
 
-export const getListInvoicesQueryKey = (params?: ListInvoicesParams) => {
+export const getListInvoicesQueryKey = (params?: ListInvoicesParams & { q?: string }) => {
   return [`/api/invoices`, ...(params ? [params] : [])] as const;
 };
 
@@ -1115,7 +1132,7 @@ export const getListInvoicesQueryOptions = <
   TData = Awaited<ReturnType<typeof listInvoices>>,
   TError = ErrorType<unknown>,
 >(
-  params?: ListInvoicesParams,
+  params?: ListInvoicesParams & { q?: string },
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listInvoices>>,
@@ -1149,7 +1166,7 @@ export function useListInvoices<
   TData = Awaited<ReturnType<typeof listInvoices>>,
   TError = ErrorType<unknown>,
 >(
-  params?: ListInvoicesParams,
+  params?: ListInvoicesParams & { q?: string },
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listInvoices>>,
@@ -1632,35 +1649,51 @@ export const useDeleteWarehouse = <
   return useMutation(getDeleteWarehouseMutationOptions(options));
 };
 
-export const getListUsersUrl = () => {
-  return `/api/users`;
+export const getListUsersUrl = (params?: { q?: string }) => {
+  const normalizedParams = new URLSearchParams();
+
+  if (params?.q) {
+    normalizedParams.append("q", params.q);
+  }
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/users?${stringifiedParams}`
+    : `/api/users`;
 };
 
-export const listUsers = async (options?: RequestInit): Promise<SysUser[]> => {
-  return customFetch<SysUser[]>(getListUsersUrl(), {
+export const listUsers = async (
+  params?: { q?: string },
+  options?: RequestInit,
+): Promise<SysUser[]> => {
+  return customFetch<SysUser[]>(getListUsersUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListUsersQueryKey = () => {
-  return [`/api/users`] as const;
+export const getListUsersQueryKey = (params?: { q?: string }) => {
+  return [`/api/users`, ...(params ? [params] : [])] as const;
 };
 
 export const getListUsersQueryOptions = <
   TData = Awaited<ReturnType<typeof listUsers>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: { q?: string },
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListUsersQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListUsersQueryKey(params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listUsers>>> = ({
     signal,
-  }) => listUsers({ signal, ...requestOptions });
+  }) => listUsers(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listUsers>>,
@@ -1677,11 +1710,14 @@ export type ListUsersQueryError = ErrorType<unknown>;
 export function useListUsers<
   TData = Awaited<ReturnType<typeof listUsers>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListUsersQueryOptions(options);
+>(
+  params?: { q?: string },
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof listUsers>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListUsersQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

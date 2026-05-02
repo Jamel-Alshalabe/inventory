@@ -10,7 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, Lock } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface ConfirmationDialogProps {
   open: boolean
@@ -20,8 +22,9 @@ interface ConfirmationDialogProps {
   confirmText?: string
   cancelText?: string
   variant?: "default" | "destructive"
-  onConfirm: () => void
+  onConfirm: (password?: string) => void
   isLoading?: boolean
+  requirePassword?: boolean
 }
 
 export function ConfirmationDialog({
@@ -34,7 +37,19 @@ export function ConfirmationDialog({
   variant = "destructive",
   onConfirm,
   isLoading = false,
+  requirePassword = false,
 }: ConfirmationDialogProps) {
+  const [password, setPassword] = React.useState("")
+
+  React.useEffect(() => {
+    if (!open) setPassword("")
+  }, [open])
+
+  const handleConfirm = () => {
+    if (requirePassword && !password) return
+    onConfirm(password)
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]" dir="rtl">
@@ -51,18 +66,44 @@ export function ConfirmationDialog({
             {description}
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="flex-row-reverse gap-2">
+
+        {requirePassword && (
+          <div className="space-y-3 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="password-confirm" className="text-right block">
+                كلمة المرور للتأكيد
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password-confirm"
+                  type="password"
+                  placeholder="أدخل كلمة مرور حسابك"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10 bg-[#0e0c20] text-white border-slate-700"
+                />
+                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-slate-500" />
+              </div>
+              <p className="text-xs text-slate-400 text-right">
+                يرجى إدخال كلمة المرور الخاصة بك للمتابعة.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="flex-row-reverse gap-2 pt-4">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isLoading}
+            className="border-slate-700 text-slate-300"
           >
             {cancelText}
           </Button>
           <Button
             variant={variant}
-            onClick={onConfirm}
-            disabled={isLoading}
+            onClick={handleConfirm}
+            disabled={isLoading || (requirePassword && !password)}
           >
             {isLoading ? "جاري التنفيذ..." : confirmText}
           </Button>
@@ -78,10 +119,11 @@ export function useConfirmation() {
     open: boolean
     title: string
     description: string
-    onConfirm: () => void
+    onConfirm: (password?: string) => void
     confirmText?: string
     cancelText?: string
     variant?: "default" | "destructive"
+    requirePassword?: boolean
   }>({
     open: false,
     title: "",
@@ -93,10 +135,11 @@ export function useConfirmation() {
     (options: {
       title: string
       description: string
-      onConfirm: () => void
+      onConfirm: (password?: string) => void
       confirmText?: string
       cancelText?: string
       variant?: "default" | "destructive"
+      requirePassword?: boolean
     }) => {
       setState({
         open: true,
@@ -116,8 +159,9 @@ export function useConfirmation() {
         confirmText={state.confirmText}
         cancelText={state.cancelText}
         variant={state.variant}
-        onConfirm={() => {
-          state.onConfirm()
+        requirePassword={state.requirePassword}
+        onConfirm={(password) => {
+          state.onConfirm(password)
           setState((prev) => ({ ...prev, open: false }))
         }}
         isLoading={isLoading}

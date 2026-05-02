@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useApp, warehouseQuery } from "@/lib/app-context";
-import { api, fmtDate, fmtMoney } from "@/services/api/api";
+import { fmtDate, fmtMoney } from "@/services/api/api";
 import { dashboardService } from "@/services/dashboard-service";
 import { Loader } from "@/components/shared/loader";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Package,
   AlertTriangle,
@@ -14,6 +15,9 @@ import {
   FileText,
   Boxes,
   TrendingUp as ProfitIcon,
+  Bell,
+  AlertCircle,
+  ArrowRight,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -113,6 +117,9 @@ export default function DashboardPage() {
     staleTime: 30000,
   });
 
+  // Use lowStockProducts from dashboard stats (no separate API call needed)
+  const lowStockProducts = (data as any)?.lowStockProducts || [];
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#050510]">
@@ -147,8 +154,82 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+ {/* Low Stock Alerts Section */}
+      {lowStockProducts.length > 0 && (
+        <Card className="bg-gradient-to-r from-amber-500/10 to-red-500/10 border-amber-500/30 backdrop-blur-xl">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Bell className="size-6 text-amber-400" />
+                  <span className="absolute -top-1 -right-1 size-3 bg-red-500 rounded-full animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">تنبيهات المخزون المنخفض</h3>
+                  <p className="text-sm text-slate-400">منتجات تحتاج لتجديد المخزون قريباً</p>
+                </div>
+              </div>
+              <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30">
+                {lowStockProducts.length} منتج
+              </Badge>
+            </div>
 
+            <div className="space-y-3">
+              {lowStockProducts.slice(0, 5).map((product: any) => {
+                const threshold = product.lowStockThreshold || product.low_stock_threshold || 5;
+                const isOutOfStock = product.quantity === 0;
+                
+                return (
+                  <div key={product.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:bg-slate-800/70 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`size-2 rounded-full ${isOutOfStock ? 'bg-red-500' : 'bg-amber-500'} animate-pulse`} />
+                      <div>
+                        <p className="font-medium text-white">{product.name}</p>
+                        <p className="text-sm text-slate-400">كود: {product.code}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-left">
+                        <div className="flex items-center justify-end gap-2">
+                          <Badge className={isOutOfStock ? "bg-red-500/15 text-red-300 border-red-500/30" : "bg-amber-500/15 text-amber-300 border-amber-500/30"}>
+                            {product.quantity}
+                          </Badge>
+                          <p className={`text-sm font-medium ${isOutOfStock ? 'text-red-400' : 'text-amber-400'}`}>
+                            {isOutOfStock ? 'نفد المخزون' : 'متبقي'}
+                          </p>
+                        </div>
+                        <p className="text-xs text-slate-500">الحد: {threshold}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                        onClick={() => {
+                          window.location.href = "/products";
+                        }}
+                      >
+                        <ArrowRight className="size-4 ml-1" />
+                        عرض المنتج
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {lowStockProducts.length > 5 && (
+              <div className="mt-4 pt-4 border-t border-slate-700/50">
+                <Button variant="ghost" className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10">
+                  عرض جميع {lowStockProducts.length} منتجات ذات المخزون المنخفض
+                  <ArrowRight className="size-4 ml-2" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+        
         <StatCard 
           label="إجمالي المنتجات" 
           value={d.totalProducts.toLocaleString("ar-EG")} 
@@ -206,6 +287,8 @@ export default function DashboardPage() {
           description="غير متوفرة حالياً"
         /> */}
       </div>
+
+     
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <div className="flex items-center gap-4 p-6 bg-gradient-to-br from-emerald-500/10 to-emerald-900/5 border border-emerald-500/20 rounded-3xl backdrop-blur-xl group">

@@ -449,6 +449,10 @@ export default function ReportsPage() {
     const printWindow = window.open('', '', 'height=900,width=1200');
     if (!printWindow) return;
 
+    const fromEmail = settings.companyEmail || "";
+    const fromPhone2 = settings.companyPhone2 || "";
+    const fromAddress = settings.companyAddress || "";
+
     let html = `
     <html dir="rtl">
     <head>
@@ -520,7 +524,10 @@ export default function ReportsPage() {
     <body>
       <div class="header">
         <h1>📊 تقرير حركة المخزون</h1>
-        <p>${settings.companyName || 'شركة سنك لقطع غيار السيارات'}</p>
+        <p>${settings.companyName || 'اسم الشركة'}</p>
+        <p>هاتف: ${settings.companyPhone || ""}${fromPhone2 ? ` - ${fromPhone2}` : ""}</p>
+        ${fromEmail ? `<p>بريد: ${fromEmail}</p>` : ""}
+        ${fromAddress ? `<p>عنوان: ${fromAddress}</p>` : ""}
         <p>الفترة: من ${displayFrom} إلى ${displayTo}</p>
       </div>
       
@@ -578,7 +585,8 @@ export default function ReportsPage() {
       
       <div class="footer">
         <p>تم استخراج التقرير في: ${new Date().toLocaleString('ar-EG')}</p>
-        <p>© ${settings.companyName || 'شركة سنك لقطع غيار السيارات'}</p>
+        <p>© ${settings.companyName || 'اسم الشركة'}</p>
+        ${fromEmail ? `<p>للتواصل: ${fromEmail}</p>` : ""}
       </div>
       
       <script>
@@ -817,7 +825,7 @@ export default function ReportsPage() {
       <div className="flex justify-center print:hidden">
         <Button 
           onClick={handlePrint} 
-          className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-3 rounded-lg text-sm flex items-center gap-2 transition"
+          className="bg-[#111127] hover:bg-[#111127] text-white px-6 py-3 rounded-lg text-sm flex items-center gap-2 transition"
         >
           <Printer className="size-4 ml-2" />
           طباعة التقرير
@@ -828,7 +836,7 @@ export default function ReportsPage() {
       <div className="hidden print:block print-only-section">
         <div className="print-header">
           <h2>📊 تقرير حركة المخزون</h2>
-          <p className="company-name">{settings.companyName || 'شركة سنك لقطع غيار السيارات'}</p>
+          <p className="company-name">{settings.companyName || 'اسم الشركة'}</p>
           <p className="report-period">الفترة: من {startDate || 'بداية السجل'} إلى {endDate || 'اليوم'}</p>
         </div>
 
@@ -895,7 +903,7 @@ export default function ReportsPage() {
         <div className="print-footer">
           <p>تم طباعة هذا التقرير من نظام إدارة المخزون</p>
           <p>{new Date().toLocaleDateString('ar-EG')} {new Date().toLocaleTimeString('ar-EG')}</p>
-          <p>© {settings.companyName || 'شركة سنك لقطع غيار السيارات'}</p>
+          <p>© {settings.companyName || 'اسم الشركة'}</p>
         </div>
       </div>
 

@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp, warehouseQuery } from "@/lib/app-context";
 import { api, fmtDate, fmtMoney } from "@/services/api/api";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,9 +24,17 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useConfirmation } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Filter, Printer } from "lucide-react";
+import { Plus, Trash2, Filter, Printer, Search, Edit } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 
 type MovementType = "in" | "out" | "all";
@@ -35,7 +44,8 @@ function getStockMovementColumns(
   currency: string,
   canEdit: boolean,
   deleteMut: any,
-  confirm: (options: { title: string; description: string; onConfirm: () => void }) => void
+  confirm: (options: { title: string; description: string; onConfirm: () => void }) => void,
+  onEdit: (movement: any) => void
 ): ColumnDef<any>[] {
   return [
     {
@@ -119,7 +129,7 @@ function getStockMovementColumns(
     },
     {
       id: "actions",
-      header: "إجراءات",
+      header: "الإجراءات",
       cell: ({ row }) => {
         const movement = row.original;
         const type = movement.type as "in" | "out";
@@ -127,21 +137,31 @@ function getStockMovementColumns(
         if (!canEdit) return null;
         
         return (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-8 sm:size-9"
-            onClick={() => {
-              confirm({
-                title: "حذف الحركة",
-                description: `هل أنت متأكد من حذف حركة ${type === "in" ? "الوارد" : "الصادر"} للمنتج "${movement.productName}"؟ هذا الإجراء لا يمكن التراجع عنه.`,
-                onConfirm: () => deleteMut.mutate(movement.id),
-              });
-            }}
-            data-testid={`button-delete-${movement.id}`}
-          >
-            <Trash2 className="size-3.5 sm:size-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8 sm:size-9"
+              onClick={() => onEdit(movement)}
+            >
+              <Edit className="size-3.5 sm:size-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8 sm:size-9 text-destructive hover:text-destructive"
+              onClick={() => {
+                confirm({
+                  title: "حذف الحركة",
+                  description: `هل أنت متأكد من حذف حركة ${type === "in" ? "الوارد" : "الصادر"} للمنتج "${movement.productName}"؟ هذا الإجراء لا يمكن التراجع عنه.`,
+                  onConfirm: () => deleteMut.mutate(movement.id),
+                });
+              }}
+              data-testid={`button-delete-${movement.id}`}
+            >
+              <Trash2 className="size-3.5 sm:size-4" />
+            </Button>
+          </div>
         );
       },
     },
@@ -158,18 +178,26 @@ export default function StockMovementsPage() {
   const canEdit = user?.role === "admin" || user?.role === "user";
 
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [selectedMovement, setSelectedMovement] = useState<any>(null);
   const [movementType, setMovementType] = useState<FormMovementType>("in");
   const [productCode, setProductCode] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [price, setPrice] = useState("0");
   const [filter, setFilter] = useState<MovementType>("all");
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 800); // Increased from 500ms to 800ms
 
   const { data: movementsResponse, isLoading: movementsLoading } = useQuery({
-    queryKey: ["movements", "all", selectedWarehouseId],
+    queryKey: ["movements", "all", selectedWarehouseId, debouncedSearch],
     queryFn: () => {
-      const params = selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined;
+      const params = { 
+        warehouseId: selectedWarehouseId || undefined,
+        q: debouncedSearch || undefined 
+      };
       return api.listMovements(params);
     },
+    enabled: !!selectedWarehouseId,
   });
 
   const movements = (movementsResponse as any)?.data || (Array.isArray(movementsResponse) ? movementsResponse : []);
@@ -191,7 +219,7 @@ export default function StockMovementsPage() {
         productCode,
         quantity: Number(quantity),
         price: Number(price),
-        warehouseId: selectedWarehouseId,
+        warehouseId: selectedWarehouseId ?? undefined,
       };
       return api.createMovement(payload);
     },
@@ -225,6 +253,23 @@ export default function StockMovementsPage() {
     },
   });
 
+  const updateMut = useMutation({
+    mutationFn: (data: any) => {
+      return api.updateMovement(selectedMovement.id, data);
+    },
+    onSuccess: () => {
+      toast({ title: "تم تحديث الحركة بنجاح" });
+      qc.invalidateQueries({ queryKey: ["movements"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      setEditOpen(false);
+      setSelectedMovement(null);
+    },
+    onError: (e: Error) => {
+      toast({ title: "خطأ", description: e.message, variant: "destructive" });
+    },
+  });
+
   // Filter movements based on selected filter
   const filteredMovements = movements.filter((movement: any) => {
     if (filter === "all") return true;
@@ -249,6 +294,15 @@ export default function StockMovementsPage() {
     setQuantity("1");
     setPrice("0");
     setOpen(true);
+  }
+
+  function handleEdit(movement: any) {
+    setSelectedMovement(movement);
+    setMovementType(movement.type);
+    setProductCode(movement.productCode);
+    setQuantity(String(movement.quantity));
+    setPrice(String(movement.price));
+    setEditOpen(true);
   }
 
   function onMovementTypeChange(type: FormMovementType) {
@@ -551,6 +605,17 @@ export default function StockMovementsPage() {
             </Button>
           )}
         </div>
+        <div className="flex items-center gap-2 w-full sm:max-w-md">
+          <div className="relative w-full">
+            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground size-4" />
+            <Input
+              placeholder="بحث بالمنتج أو الكود..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pr-10 w-full"
+            />
+          </div>
+        </div>
       </div>
 
       {canEdit && (
@@ -651,14 +716,102 @@ export default function StockMovementsPage() {
           </div>
         ) : (
           <DataTable
-            columns={getStockMovementColumns(currency, canEdit, deleteMut, confirm)}
+            columns={getStockMovementColumns(currency, canEdit, deleteMut, confirm, handleEdit)}
             data={filteredMovements}
-            searchKey="productName"
-            searchPlaceholder="بحث بالاسم أو الكود..."
             emptyMessage="لا توجد حركات"
           />
         )}
       </Card>
+
+      {/* Edit Movement Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تعديل حركة مخزن</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>نوع الحركة</Label>
+                <Select value={movementType} onValueChange={onMovementTypeChange}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                        وارد
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="out">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        صادر
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>المنتج</Label>
+                <Select value={productCode} onValueChange={onPickProduct}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر المنتج" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map((p: any) => (
+                      <SelectItem key={p.id} value={p.code}>
+                        {p.name} ({p.code}) — متاح {p.quantity}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>الكمية</Label>
+                <Input
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>السعر</Label>
+                <Input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              الإجمالي: {fmtMoney(Number(quantity) * Number(price) || 0, currency)}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              إلغاء
+            </Button>
+            <Button
+              onClick={() => {
+                updateMut.mutate({
+                  type: movementType,
+                  productCode,
+                  quantity: Number(quantity),
+                  price: Number(price),
+                  warehouseId: selectedWarehouseId ?? undefined,
+                });
+              }}
+              disabled={!productCode || updateMut.isPending}
+            >
+              {updateMut.isPending ? "جاري التحديث..." : "تحديث"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <ConfirmationComponent isLoading={deleteMut.isPending} />
     </div>

@@ -11,8 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 
 // Extended user type that matches actual API response
 interface UserWithPermissions extends Omit<AuthUser, 'role'> {
-  permissions?: string[];
-  role?: string;
+  permissions: string[];
+  role: string;
 }
 
 // Routes ordered by priority with their required permissions
@@ -75,6 +75,7 @@ export default function LoginPage() {
       toast({
         title: "تم تسجيل الدخول بنجاح",
         description: "جاري التحويل...",
+        variant: "success",
       });
       
       // وجه إلى أول صفحة متاحة فوراً
@@ -129,7 +130,6 @@ export default function LoginPage() {
             <h1 className="text-3xl font-black text-white tracking-tight mb-2">
               نظام إدارة المخزون
             </h1>
-            <p className="text-slate-400 text-sm">قطع غيار السيارات</p>
           </div>
         <form onSubmit={onSubmit} className="space-y-5">
           {/* Username Field */}

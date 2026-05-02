@@ -20,7 +20,8 @@ import {
   Save, 
   UserCircle,
   ShieldCheck,
-  Settings2
+  Settings2,
+  Mail
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -31,6 +32,8 @@ export default function SettingsPage() {
   const [companyName, setCompanyName] = useState("");
   const [currency, setCurrency] = useState("");
   const [companyPhone, setCompanyPhone] = useState("");
+  const [companyPhone2, setCompanyPhone2] = useState("");
+  const [companyEmail, setCompanyEmail] = useState("");
   const [companyAddress, setCompanyAddress] = useState("");
 
   useEffect(() => {
@@ -42,6 +45,8 @@ export default function SettingsPage() {
       setCompanyName(settings.companyName || "");
       setCurrency(settings.currency || "ج.م");
       setCompanyPhone(settings.companyPhone || "");
+      setCompanyPhone2(settings.companyPhone2 || "");
+      setCompanyEmail(settings.companyEmail || "");
       setCompanyAddress(settings.companyAddress || "");
     }
   }, [settings]);
@@ -79,6 +84,8 @@ export default function SettingsPage() {
       companyName,
       currency,
       companyPhone,
+      companyPhone2,
+      companyEmail,
       companyAddress,
     }),
     onSuccess: () => {
@@ -159,7 +166,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-3">
-                    <Label className="text-slate-200 font-medium">رقم الهاتف</Label>
+                    <Label className="text-slate-200 font-medium">رقم الهاتف الأول</Label>
                     <div className="relative group">
                       <Input 
                         value={companyPhone} 
@@ -168,6 +175,33 @@ export default function SettingsPage() {
                         className="bg-[#0c0b1a] border-[#2a2a4a] text-white pr-10 focus:border-blue-500/50 focus:ring-blue-500/10 h-12"
                       />
                       <Phone className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-slate-200 font-medium">رقم الهاتف الثاني</Label>
+                    <div className="relative group">
+                      <Input 
+                        value={companyPhone2} 
+                        onChange={(e) => setCompanyPhone2(e.target.value)} 
+                        placeholder="أدخل رقم هاتف إضافي (اختياري)"
+                        className="bg-[#0c0b1a] border-[#2a2a4a] text-white pr-10 focus:border-blue-500/50 focus:ring-blue-500/10 h-12"
+                      />
+                      <Phone className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-slate-200 font-medium">البريد الإلكتروني</Label>
+                    <div className="relative group">
+                      <Input 
+                        type="email"
+                        value={companyEmail} 
+                        onChange={(e) => setCompanyEmail(e.target.value)} 
+                        placeholder="أدخل البريد الإلكتروني للمؤسسة"
+                        className="bg-[#0c0b1a] border-[#2a2a4a] text-white pr-10 focus:border-blue-500/50 focus:ring-blue-500/10 h-12"
+                      />
+                      <Mail className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
                     </div>
                   </div>
 

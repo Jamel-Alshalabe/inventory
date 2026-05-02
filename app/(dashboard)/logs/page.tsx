@@ -1,16 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "@/lib/app-context";
 import { api } from "@/services/api/api";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
 import { Search, Filter, RefreshCw, Calendar, User, Activity } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface ActivityLogItem {
   id: number;
@@ -31,22 +31,34 @@ interface ActivityLogItem {
 export default function LogsPage() {
   const { user } = useApp();
   const { toast } = useToast();
+  const qc = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [limit, setLimit] = useState("50");
 
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      qc.invalidateQueries({ queryKey: ["activity-logs", limit] });
+    }, 800); // Increased from 300ms to 800ms
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, limit, qc]);
+
   const { data: response = { data: [] }, isLoading, refetch } = useQuery({
-    queryKey: ["activity-logs", limit],
-    queryFn: () => api.getLogs(parseInt(limit)),
+    queryKey: ["activity-logs", limit, searchTerm],
+    queryFn: () => {
+      const url = `/api/activity-logs?limit=${limit}${searchTerm ? `&q=${encodeURIComponent(searchTerm)}` : ''}`;
+      return fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'include',
+      }).then(res => res.json());
+    },
   });
 
   const logs = response.data || [];
-  
-  const filteredLogs = logs.filter((log: ActivityLogItem) =>
-    log.logName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.causerUsername?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.subjectType?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
@@ -151,7 +163,7 @@ export default function LogsPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-lg">العمليات</h2>
           <Badge variant="secondary">
-            {filteredLogs.length} عملية
+            {logs.length} عملية
           </Badge>
         </div>
 
@@ -160,7 +172,7 @@ export default function LogsPage() {
             <RefreshCw className="h-6 w-6 animate-spin" />
             <span className="mr-2">جاري التحميل...</span>
           </div>
-        ) : filteredLogs.length === 0 ? (
+        ) : logs.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>لا توجد عمليات للعرض</p>
@@ -180,7 +192,7 @@ export default function LogsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLogs.map((log: ActivityLogItem) => (
+                  {logs.map((log: ActivityLogItem) => (
                     <TableRow key={log.id} className="border-b hover:bg-muted/30 transition-colors">
                       <TableCell className="py-3">
                         <div className="flex justify-center">

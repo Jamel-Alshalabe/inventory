@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { useApp, warehouseQuery } from "@/lib/app-context";
@@ -18,7 +18,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useConfirmation } from "@/components/ui/confirmation-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, FileSpreadsheet, Download, Search, Upload, CloudUpload, FileUp } from "lucide-react";
+import { useDebounce } from "@/hooks/use-debounce";
+import { Plus, Pencil, Trash2, FileSpreadsheet, Download, Search, Upload, CloudUpload, FileUp, AlertCircle } from "lucide-react";
 
 import { Loader } from "@/components/shared/loader";
 
@@ -29,9 +30,10 @@ type FormState = {
   buyPrice: string;
   sellPrice: string;
   quantity: string;
+  lowStockThreshold: string;
 };
 
-const empty: FormState = { name: "", code: "", buyPrice: "0", sellPrice: "0", quantity: "0" };
+const empty: FormState = { name: "", code: "", buyPrice: "0", sellPrice: "0", quantity: "0", lowStockThreshold: "5" };
 
 type ProductImportRow = {
   code: string;
@@ -42,11 +44,16 @@ type ProductImportRow = {
 };
 
 function mapRowToProduct(row: Record<string, any>): ProductImportRow | null {
-  const code = String(row["كود"] ?? row["code"] ?? row["Code"] ?? "").trim();
-  const name = String(row["اسم"] ?? row["name"] ?? row["Name"] ?? "").trim();
-  const quantity = Number(row["كمية"] ?? row["quantity"] ?? row["Quantity"] ?? 0);
-  const buyPrice = Number(row["شراء"] ?? row["buyPrice"] ?? row["BuyPrice"] ?? 0);
-  const sellPrice = Number(row["بيع"] ?? row["sellPrice"] ?? row["SellPrice"] ?? 0);
+  const getVal = (keys: string[]) => {
+    const foundKey = Object.keys(row).find(k => keys.some(key => k.trim() === key || k.includes(key)));
+    return foundKey ? row[foundKey] : null;
+  };
+
+  const code = String(getVal(["كود", "code", "Code"]) ?? "").trim();
+  const name = String(getVal(["اسم", "name", "Name"]) ?? "").trim();
+  const quantity = Number(getVal(["كمية", "quantity", "Quantity", "الكمية"]) ?? 0);
+  const buyPrice = Number(getVal(["شراء", "buyPrice", "BuyPrice", "الشراء"]) ?? 0);
+  const sellPrice = Number(getVal(["بيع", "sellPrice", "SellPrice", "البيع"]) ?? 0);
 
   if (!code || !name) return null;
 
@@ -66,6 +73,26 @@ export default function ProductsPage() {
   const { ConfirmationComponent, confirm } = useConfirmation();
 
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 800);
+
+  // Query for low stock products - Independent and immediate
+  const { data: lowStockProducts = [] } = useQuery({
+    queryKey: ["low-stock-alerts", selectedWarehouseId],
+    queryFn: () => {
+      if (!selectedWarehouseId) return [];
+      return api.listProducts({
+        warehouseId: selectedWarehouseId,
+        perPage: 100,
+        lowStockOnly: true,
+      } as any).then((response) => {
+        const products = Array.isArray(response) ? response : (response as any).data || [];
+        return products as any;
+      });
+    },
+    enabled: !!selectedWarehouseId,
+    staleTime: 30000,
+  });
+
   const [page, setPage] = useState(1);
   const [perPage] = useState(15);
   const [editOpen, setEditOpen] = useState(false);
@@ -85,14 +112,18 @@ export default function ProductsPage() {
   }>>([]);
 
   const { data: response, isLoading } = useQuery({
-    queryKey: ["products", selectedWarehouseId, search, page],
+    queryKey: ["products", selectedWarehouseId, debouncedSearch, page],
     queryFn: () => api.listProducts({ 
       warehouseId: selectedWarehouseId || undefined,
-      q: search || undefined,
+      q: debouncedSearch || undefined,
       page,
       perPage
     } as any),
     enabled: !!selectedWarehouseId,
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    gcTime: 60000, // Keep data in cache for 1 minute
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Don't refetch on component mount if data exists
   });
 
   const canEdit = user?.role === "admin" || user?.role === "user";
@@ -102,13 +133,37 @@ export default function ProductsPage() {
   const meta = response && 'meta' in response ? (response as any).meta : null;
   const currency = settings.currency || "ج.م";
 
+  // Function to get stock status badge
+  const getStockBadge = (quantity: number, lowStockThreshold?: number) => {
+    const threshold = lowStockThreshold || 5;
+    if (quantity === 0) {
+      return {
+        text: "نفد المخزون",
+        className: "bg-red-500/20 text-red-400 border border-red-500/30",
+        icon: "🚨"
+      };
+    } else if (quantity <= threshold) {
+      return {
+        text: `مخزون منخفض (${threshold})`,
+        className: "bg-amber-500/20 text-amber-400 border border-amber-500/30",
+        icon: "⚠️"
+      };
+    } else {
+      return {
+        text: "متوفر",
+        className: "bg-green-500/20 text-green-400 border border-green-500/30",
+        icon: "✅"
+      };
+    }
+  };
+
   const createMut = useMutation({
     mutationFn: (data: Omit<Product, "id" | "createdAt" | "warehouseName">) => api.createProduct(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
       setCreateOpen(false);
       setCreate(empty);
-      toast({ title: "تم إضافة المنتج بنجاح" });
+      toast({ title: "تم إضافة المنتج بنجاح", variant: "success" });
     },
     onError: (error: any) => toast({ title: "خطأ", description: error.message, variant: "destructive" }),
   });
@@ -119,18 +174,21 @@ export default function ProductsPage() {
       qc.invalidateQueries({ queryKey: ["products"] });
       setEditOpen(false);
       setEdit(empty);
-      toast({ title: "تم تحديث المنتج بنجاح" });
+      toast({ title: "تم تحديث المنتج بنجاح", variant: "success" });
     },
     onError: (error: any) => toast({ title: "خطأ", description: error.message, variant: "destructive" }),
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => api.deleteProduct(id),
+    mutationFn: ({ id, password }: { id: number; password?: string }) => api.deleteProduct(id, { password } as any),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
-      toast({ title: "تم حذف المنتج بنجاح" });
+      toast({ title: "تم حذف المنتج بنجاح", variant: "success" });
     },
-    onError: (error: any) => toast({ title: "خطأ", description: error.message, variant: "destructive" }),
+    onError: (error: any) => {
+      const msg = error.response?.data?.message || error.message || "فشل حذف المنتج";
+      toast({ title: "خطأ", description: msg, variant: "destructive" });
+    },
   });
 
   const handleCreate = () => {
@@ -141,6 +199,7 @@ export default function ProductsPage() {
       buyPrice: Number(create.buyPrice),
       sellPrice: Number(create.sellPrice),
       quantity: Number(create.quantity),
+      lowStockThreshold: create.lowStockThreshold ? Number(create.lowStockThreshold) : undefined,
       warehouseId: selectedWarehouseId,
     });
   };
@@ -155,6 +214,7 @@ export default function ProductsPage() {
         buyPrice: Number(edit.buyPrice),
         sellPrice: Number(edit.sellPrice),
         quantity: Number(edit.quantity),
+        lowStockThreshold: edit.lowStockThreshold ? Number(edit.lowStockThreshold) : undefined,
         warehouseId: selectedWarehouseId,
       },
     });
@@ -191,41 +251,43 @@ export default function ProductsPage() {
     if (!importFile || !selectedWarehouseId) {
       toast({
         title: "خطأ",
-        description: "يجب اختيار ملف ومستودع أولاً",
+        description: "يجب اختيار ملف واختيار المخزن من القائمة العلوية أولاً",
         variant: "destructive",
       });
       return;
     }
 
     const productsToCreate = previewData
-      .filter((p) => !p.exists)
       .map((p) => ({
-        code: p.code,
-        name: p.name,
-        quantity: p.quantity,
-        buyPrice: p.buyPrice,
-        sellPrice: p.sellPrice,
+        code: String(p.code),
+        name: String(p.name),
+        quantity: Number(p.quantity),
+        buyPrice: Number(p.buyPrice),
+        sellPrice: Number(p.sellPrice),
       }));
 
     if (productsToCreate.length === 0) {
       toast({
-        title: "لا يوجد منتجات جديدة",
-        description: "كل الأكواد الموجودة في الملف موجودة بالفعل",
+        title: "تنبيه",
+        description: "لم يتم العثور على أي بيانات صالحة في الملف",
+        variant: "destructive"
       });
       return;
     }
 
     setImporting(true);
     try {
+      // Backend expects 'items' field
       await api.bulkCreateProducts({
         items: productsToCreate,
         warehouseId: selectedWarehouseId,
-      });
+      } as any);
 
       await qc.invalidateQueries({ queryKey: ["products"] });
       toast({
         title: "تم الاستيراد",
         description: "تم استيراد المنتجات بنجاح",
+        variant: "success",
       });
       setImportOpen(false);
       setImportFile(null);
@@ -249,6 +311,7 @@ export default function ProductsPage() {
       buyPrice: product.buyPrice.toString(),
       sellPrice: product.sellPrice.toString(),
       quantity: product.quantity.toString(),
+      lowStockThreshold: (product.lowStockThreshold || 5).toString(),
     });
     setEditOpen(true);
   };
@@ -256,17 +319,12 @@ export default function ProductsPage() {
   const handleDelete = (productId: number, productName: string) => {
     confirm({
       title: "حذف المنتج",
-      description: `هل أنت متأكد من حذف "${productName}"؟`,
-      onConfirm: () => {
-        deleteMut.mutate(productId);
+      description: `هل أنت متأكد من حذف "${productName}"؟ يتطلب هذا الإجراء تأكيد كلمة المرور.`,
+      requirePassword: true,
+      onConfirm: (password) => {
+        deleteMut.mutate({ id: productId, password });
       },
     });
-  };
-
-  const getStockBadge = (quantity: number) => {
-    if (quantity <= 10) return { variant: "destructive" as const, text: "منخفض جداً" };
-    if (quantity <= 50) return { variant: "secondary" as const, text: "منخفض" };
-    return { variant: "default" as const, text: "متوفر" };
   };
 
   if (isLoading) return <Loader fullScreen text="جاري تحميل المنتجات..." />;
@@ -305,7 +363,7 @@ export default function ProductsPage() {
                     <span className="sm:hidden">إضافة</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="bg-[#16162b] border border-slate-700/50">
+                <DialogContent className="bg-[#111127] border border-slate-700/50">
                   <DialogHeader>
                     <DialogTitle className="text-white">إضافة منتج جديد</DialogTitle>
                   </DialogHeader>
@@ -353,6 +411,16 @@ export default function ProductsPage() {
                         value={create.quantity}
                         onChange={(e) => setCreate({ ...create, quantity: e.target.value })}
                         className="bg-[#0e0c20] text-white"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-slate-400">حد المخزون المنخفض</Label>
+                      <Input
+                        type="number"
+                        value={create.lowStockThreshold}
+                        onChange={(e) => setCreate({ ...create, lowStockThreshold: e.target.value })}
+                        className="bg-[#0e0c20] text-white"
+                        placeholder="تنبيه عند الوصول لهذه الكمية"
                       />
                     </div>
                   </div>
@@ -526,7 +594,7 @@ export default function ProductsPage() {
                     </Button>
                     <Button
                       onClick={handleImportExcel}
-                      disabled={!importFile || !selectedWarehouseId || importing || previewData.filter(p => !p.exists).length === 0}
+                      disabled={!importFile || !selectedWarehouseId || importing}
                       className="min-w-[100px]"
                     >
                       {importing ? (
@@ -559,6 +627,84 @@ export default function ProductsPage() {
             className="bg-[#0e0c20] text-white placeholder:text-slate-500 w-full"
           />
         </div>
+
+        {/* Low Stock Alerts Section */}
+        {lowStockProducts.length > 0 && (
+          <Card className="bg-gradient-to-r from-amber-500/10 to-red-500/10 border-amber-500/30 backdrop-blur-xl">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <AlertCircle className="size-5 text-amber-400" />
+                    <span className="absolute -top-1 -right-1 size-2 bg-red-500 rounded-full animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-semibold text-white">تنبيهات المخزون المنخفض</h4>
+                    <p className="text-xs text-slate-400">منتجات تحتاج لتجديد المخزون</p>
+                  </div>
+                </div>
+                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-xs">
+                  {lowStockProducts.length} منتج
+                </Badge>
+              </div>
+
+              <div className="space-y-2">
+                {lowStockProducts.slice(0, 3).map((product: any) => {
+                  const threshold = product.lowStockThreshold || 5;
+                  const isOutOfStock = product.quantity === 0;
+                  
+                  return (
+                    <div key={product.id} className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <div className="flex items-center gap-2">
+                        <div className={`size-1.5 rounded-full ${isOutOfStock ? 'bg-red-500' : 'bg-amber-500'} animate-pulse`} />
+                        <div>
+                          <p className="text-sm font-medium text-white truncate max-w-[200px]">{product.name}</p>
+                          <p className="text-xs text-slate-400">كود: {product.code}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-left">
+                          <div className="flex items-center justify-end gap-2">
+                            <Badge className={isOutOfStock ? "bg-red-500/15 text-red-300 border-red-500/30" : "bg-amber-500/15 text-amber-300 border-amber-500/30"}>
+                              {product.quantity}
+                            </Badge>
+                            <p className={`text-xs font-medium ${isOutOfStock ? 'text-red-400' : 'text-amber-400'}`}>
+                              {isOutOfStock ? 'نفد المخزون' : 'متبقي'}
+                            </p>
+                          </div>
+                          <p className="text-xs text-slate-500">حد: {threshold}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 px-2 text-slate-300 hover:bg-slate-700/60"
+                          onClick={() => {
+                            setSearch(product.code);
+                            setPage(1);
+                            setTimeout(() => {
+                              const el = document.querySelector(`[data-product-code="${product.code}"]`);
+                              el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }, 50);
+                          }}
+                        >
+                          عرض
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {lowStockProducts.length > 3 && (
+                <div className="mt-3 pt-3 border-t border-slate-700/50">
+                  <p className="text-xs text-amber-400 text-center">
+                    +{lowStockProducts.length - 3} منتجات أخرى ذات مخزون منخفض
+                  </p>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
         
         {/* Products Table */}
         <div className="bg-[#111127] border border-gray-700 rounded-xl overflow-hidden shadow-xl">
@@ -569,6 +715,7 @@ export default function ProductsPage() {
                   <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">الكود</th>
                   <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">الاسم</th>
                   <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">الكمية</th>
+                  <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">حالة المخزون</th>
                   <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">الشراء</th>
                   <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">البيع</th>
                   <th className="px-2 sm:px-4 py-2 sm:py-3 text-right font-medium text-xs sm:text-sm">إجراءات</th>
@@ -577,21 +724,21 @@ export default function ProductsPage() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8">
+                    <td colSpan={7} className="text-center py-8">
                       <Loader />
                     </td>
                   </tr>
                 ) : productData.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-slate-400">
+                    <td colSpan={7} className="text-center py-8 text-slate-400">
                       لا توجد منتجات
                     </td>
                   </tr>
                 ) : (
                   productData.map((product: Product) => {
-                    const stockBadge = getStockBadge(product.quantity);
+                    const stockBadge = getStockBadge(product.quantity, product.lowStockThreshold);
                     return (
-                      <tr key={product.id} className="border-t border-slate-700/50">
+                      <tr key={product.id} data-product-code={product.code} className="border-t border-slate-700/50">
                         <td className="px-2 sm:px-4 py-2 sm:py-3 font-mono text-xs">{product.code}</td>
                         <td className="px-2 sm:px-4 py-2 sm:py-3 font-medium text-white truncate max-w-[150px] sm:max-w-none" title={product.name}>
                           {product.name}
@@ -600,6 +747,12 @@ export default function ProductsPage() {
                           <Badge variant={stockBadge.variant} className="text-xs">
                             {product.quantity} 
                           </Badge>
+                        </td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3">
+                          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${stockBadge.className}`}>
+                            <span>{stockBadge.icon}</span>
+                            <span>{stockBadge.text}</span>
+                          </div>
                         </td>
                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-sm">{fmtMoney(product.buyPrice)}</td>
                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-sm font-medium">{fmtMoney(product.sellPrice)}</td>
@@ -722,6 +875,16 @@ export default function ProductsPage() {
                 value={edit.quantity}
                 onChange={(e) => setEdit({ ...edit, quantity: e.target.value })}
                 className="bg-[#0e0c20] text-white"
+              />
+            </div>
+            <div>
+              <Label className="text-slate-400">حد المخزون المنخفض</Label>
+              <Input
+                type="number"
+                value={edit.lowStockThreshold}
+                onChange={(e) => setEdit({ ...edit, lowStockThreshold: e.target.value })}
+                className="bg-[#0e0c20] text-white"
+                placeholder="تنبيه عند الوصول لهذه الكمية"
               />
             </div>
           </div>

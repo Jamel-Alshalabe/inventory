@@ -35,7 +35,15 @@ function Routes() {
     permissions: string[]; 
     requireAny?: boolean; // true = any permission, false = all permissions
   }) {
-    if (!user?.permissions || user.permissions.length === 0) {
+    const userRole = user?.role as string;
+    const userPermissions = (user as any)?.permissions || [];
+
+    // Super admin bypasses all permission checks
+    if (userRole === 'super_admin') {
+      return <>{children}</>;
+    }
+
+    if (userPermissions.length === 0) {
       return (
         <div className="text-center py-20 text-muted-foreground">
           ليس لديك صلاحية للوصول لهذه الصفحة
@@ -44,8 +52,8 @@ function Routes() {
     }
     
     const hasPermission = requireAny
-      ? permissions.some(permission => user.permissions.includes(permission))
-      : permissions.every(permission => user.permissions.includes(permission));
+      ? permissions.some(permission => userPermissions.includes(permission))
+      : permissions.every(permission => userPermissions.includes(permission));
       
     if (!hasPermission) {
       return (
@@ -118,7 +126,7 @@ function Routes() {
         )}
       </Route>
       <Route path="/subscriptions">
-        {() => (user?.role === 'super_admin' ? <SubscriptionsPage /> : <NotFound />)}
+        {() => ((user?.role as string) === 'super_admin' ? <SubscriptionsPage /> : <NotFound />)}
       </Route>
       <Route path="/settings">
         {() => (

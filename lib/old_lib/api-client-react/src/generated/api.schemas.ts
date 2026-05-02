@@ -24,15 +24,26 @@ export const SysUserRole = {
   admin: "admin",
   user: "user",
   editor: "editor",
+  super_admin: "super_admin",
+  auditor: "auditor",
 } as const;
 
 export interface SysUser {
   id: number;
   username: string;
+  email?: string | null;
   role: SysUserRole;
+  permissions: string[];
   assignedWarehouseId?: number | null;
   assignedWarehouseName?: string | null;
-  max_warehouses?: number;
+  maxWarehouses?: number;
+  createdById?: number | null;
+  companyName?: string | null;
+  companyPhone?: string | null;
+  phone2?: string | null;
+  companyAddress?: string | null;
+  companyCurrency?: string | null;
+  createdAt?: string;
 }
 
 export interface AuthResponse {
@@ -50,19 +61,29 @@ export const CreateUserBodyRole = {
   admin: "admin",
   user: "user",
   editor: "editor",
+  auditor: "auditor",
 } as const;
 
 export interface CreateUserBody {
   username: string;
+  email?: string | null;
   password: string;
   role: CreateUserBodyRole;
   assignedWarehouseId?: number | null;
+  max_warehouses?: number;
+  company_name?: string | null;
+  company_phone?: string | null;
+  phone2?: string | null;
+  company_address?: string | null;
+  company_currency?: string | null;
+  permissions?: string[];
 }
 
 export interface Warehouse {
   id: number;
   name: string;
   productCount: number;
+  admin?: SysUser | null;
 }
 
 export interface Product {
@@ -72,6 +93,7 @@ export interface Product {
   buyPrice: number;
   sellPrice: number;
   quantity: number;
+  lowStockThreshold?: number;
   warehouseId: number;
   warehouseName?: string | null;
   createdAt: string;
@@ -83,6 +105,7 @@ export interface CreateProductBody {
   buyPrice: number;
   sellPrice: number;
   quantity: number;
+  lowStockThreshold?: number;
   warehouseId?: number;
 }
 
@@ -92,6 +115,7 @@ export interface UpdateProductBody {
   buyPrice?: number;
   sellPrice?: number;
   quantity?: number;
+  lowStockThreshold?: number;
 }
 
 export interface BulkResult {
